@@ -209,19 +209,25 @@ console.log('\nDRIVETRAIN BEHAVIOUR');
   check('braking to a stop does not drop into reverse', parked.speed < 0.3,
     `${(parked.vf).toFixed(2)} m/s after a 1 s stop`);
 
-  // -- a deliberate hold does select reverse
-  const rev = new CarState();
-  hold(rev, 2.0, inp({ brake: 1 }));
-  check('a deliberate hold still selects reverse', rev.vf < -1.0,
-    `${(rev.vf).toFixed(2)} m/s after 2 s`);
+  // -- no amount of brake should EVER reverse: it is a brake, not a gear
+  const longHold = new CarState();
+  hold(longHold, 4.0, inp({ brake: 1 }));
+  check('holding the brake for 4 s still does not reverse', longHold.vf > -0.3,
+    `${(longHold.vf).toFixed(2)} m/s`);
 
-  // -- and releasing the brake stops reversing
-  const back = new CarState();
-  hold(back, 1.5, inp({ brake: 1 }));
-  const vBack = back.vf;
-  hold(back, 0.5, inp({}));
-  check('releasing the brake stops the reverse creep', back.vf >= vBack,
-    `${vBack.toFixed(2)} -> ${back.vf.toFixed(2)} m/s`);
+  // -- reverse is a gear: select it in manual and use the throttle
+  const rev = new CarState();
+  rev.manual = true; rev.playerGear = 0;
+  hold(rev, 2.0, inp({ throttle: 1, manual: true }));
+  check('reverse gear drives the car backwards', rev.vf < -1.0,
+    `${(rev.vf).toFixed(2)} m/s on throttle in R`);
+  check('and the brake stops it', (() => {
+    const b = new CarState(); b.manual = true; b.playerGear = 0;
+    hold(b, 1.5, inp({ throttle: 1, manual: true }));
+    const moving = b.vf;
+    hold(b, 0.6, inp({ throttle: 1, brake: 1, manual: true }));
+    return b.vf > moving;
+  })());
 
   // -- burnout: brake + throttle at a standstill
   const burn = new CarState();

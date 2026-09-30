@@ -161,6 +161,34 @@ holds the car and lights the rears up while the engine screams.
 reverse; the brake has to be held for 1.2 s while stationary. Pressing the brake
 pedal should never make you go backwards.
 
+### Holding a slide
+
+A drift has to be *holdable*, not just initiable. Three things make that work,
+and all three were added because the car kept snapping straight the moment you
+countersteered:
+
+- **Sticky slide state.** Once the rear is loose it stays loose briefly, so a
+  dip in angle does not instantly re-plant the tyres. Lift off, straighten, and
+  it decays back to planted in about a second.
+- **Throttle sustains the slide.** Countersteer is by definition *less* lock
+  than the slide was started with, so a blend driven by steering angle reads
+  "not drifting" exactly when you are holding the biggest angle. On the gas
+  with real slip, the rear stays lit whatever the wheel is doing.
+- **Power keeps the car rotating.** In this model steering commands yaw
+  directly, so countersteer commands the *opposite* yaw, flips the rotation and
+  straightens the car. A real drift keeps yawing into the corner — the rotation
+  comes from a lit rear tyre. That is modelled explicitly.
+
+The result: a donut settles at ~39 deg, and unwinding into countersteer on the
+throttle holds ~46 deg instead of snapping to zero in half a second. The grip
+line is untouched — gentle steering at full throttle still grips at 136 km/h.
+
+### Reverse
+
+Reverse is a **gear**, not a pedal. Braking never selects it: hold the brake for
+four seconds at a standstill and nothing happens. In manual, shift down past
+1st (or use the R gate on an H-pattern) and the throttle drives you backwards.
+
 ### Sense of speed
 
 The lens does most of the work. Field of view opens from 68° to about 102° across

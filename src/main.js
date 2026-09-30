@@ -57,7 +57,7 @@ function applyTune(id) {
    SAVE
    ============================================================ */
 const SAVE_KEY = 'driftblock.v1';
-const DEFAULT_SAVE = { paint: 'magenta', tune: 'balanced', bests: {}, wheel: null, volume: 0.72, engineVol: 1.0, uiScale: null, gearbox: false };
+const DEFAULT_SAVE = { paint: 'magenta', tune: 'balanced', bests: {}, wheel: null, volume: 0.9, engineVol: 1.15, uiScale: null, gearbox: false };
 
 function loadSave() {
   try {
@@ -120,8 +120,8 @@ const wheelUI = new WheelUI(wheel, ffb, save, () => {
   } catch { /* no bridge running, which is the normal case */ }
 })();
 const paint = PAINTS.find((p) => p.id === save.paint) || PAINTS[0];
-audio.setMasterVolume(save.volume ?? 0.72);
-audio.setEngineVolume(save.engineVol ?? 1.0);
+audio.setMasterVolume(save.volume ?? 0.9);
+audio.setEngineVolume(save.engineVol ?? 1.15);
 
 /* ---------------- world ---------------- */
 let track = null;
@@ -711,7 +711,7 @@ function frame(now) {
   if (game && track) {
     const st = game.car;
     updateCarVisual(carMesh, st, input.state, rawDt, game.onGrass);
-    effects.update(rawDt, st, { onGrass: game.onGrass, boost: st.boost, painting: paint });
+    effects.update(rawDt, st, { onGrass: game.onGrass, boost: st.boost, wheelspin: st.wheelspin, painting: paint });
     camRig.update(rawDt, st, { boost: st.boost, accel: st.longAccel });
     track.updateShadow(st);
     track.updateClouds(rawDt);

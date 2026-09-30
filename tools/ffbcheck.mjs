@@ -105,7 +105,10 @@ function settle(slip0, sign, dir) {
   // torque is positive = rim pushed RIGHT. In Input.state space, right is
   // NEGATIVE (see the comment in input.js), so a positive torque nudges
   // state.steer downwards.
-  const nudge = -Math.sign(f.torque) * 0.22 * dir;
+  // Steer fully to whichever side the rim is pushing (obey) or the opposite
+  // way (fight). A small nudge is no longer a fair test: power now sustains
+  // the rotation, so it takes real countersteer to bring the slide back.
+  const nudge = -Math.sign(f.torque) * 0.85 * dir;
 
   const before = Math.abs(s.slip);
   for (let i = 0; i < Math.round(0.5 / dt); i++) {

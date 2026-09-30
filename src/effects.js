@@ -440,7 +440,11 @@ export class Effects {
     // ---- how hard each wheel is sliding -------------------------------
     const slipAmt = clamp(s.absSlip / 0.85, 0, 1);
     const spd = clamp(s.speed / 9, 0, 1);
-    const slide = slipAmt * spd;
+    // A burnout produces no slide and no road speed, so the old "slip x speed"
+    // measure read zero and the tyres smoked not at all while spinning on the
+    // spot. Lit tyres are their own source.
+    const spun = clamp(opts.wheelspin || 0, 0, 1);
+    const slide = Math.max(slipAmt * spd, spun);
     // rear wheels slide more than fronts under power
     const wheelSlide = [
       slide * (onGrass ? 1.0 : 0.55),
@@ -452,7 +456,8 @@ export class Effects {
     // ---- tyre marks ---------------------------------------------------
     // lay a segment every ~0.55 m of travel while sliding
     const emitSpacing = 0.55;
-    this._skidAcc += s.speed * dt;
+    // distance travelled OR tyre rotation — a stationary burnout still marks
+    this._skidAcc += Math.max(s.speed, spun * 9) * dt;
     const doEmit = this._skidAcc >= emitSpacing;
     if (doEmit) this._skidAcc = 0;
 
@@ -476,25 +481,32 @@ export class Effects {
       this._smokeAcc -= smokeStep;
       const rear = [wheels[2], wheels[3]];
       for (const w of rear) {
-        const amt = wheelSlide[2];
+        // a burnout has almost no slide, so the lit rear tyres are their own
+        // smoke source; a sliding car smokes off the slide
+        const amt = Math.max(wheelSlide[2], spun);
+        // A stationary burnout pours smoke out of one spot, so without pulling
+        // it back it piles into a single opaque cloud that hides the car.
+        const plume = spun * (1 - slipAmt * 0.6);
         if (amt < 0.16) continue;
-        if (Math.random() > amt * 1.1) continue;
-        if (this.smoke.live > 430) continue;   // self-limit so a donut can't white out the view
+        if (Math.random() > amt * (1.1 - 0.62 * plume)) continue;
+        // a tighter cap when sitting still, where every puff stacks in one place
+        if (this.smoke.live > (spun > 0.5 && spd < 0.2 ? 150 : 430)) continue;
 
         const base = onGrass ? [0.62, 0.56, 0.40] : [0.92, 0.93, 0.98];
         const tint = boost > 0 ? [1.0, 0.75, 0.95] : base;
+        // Puffs are smaller, thinner and quicker off the mark.
         const spread = 0.5 + amt * 2.4;
         this.smoke.spawn({
           x: w.x + (Math.random() - 0.5) * 0.5,
           y: 0.18 + Math.random() * 0.25,
           z: w.z + (Math.random() - 0.5) * 0.5,
-          vx: -s.vx * 0.13 + (Math.random() - 0.5) * spread,
-          vy: 0.7 + Math.random() * 1.5 * amt,
-          vz: -s.vz * 0.13 + (Math.random() - 0.5) * spread,
-          life: 0.40 + Math.random() * 0.46 * (0.5 + amt),
-          size0: 0.13 + Math.random() * 0.15,
-          size1: 0.62 + amt * 1.45 + Math.random() * 0.65,
-          alpha: 0.30 + amt * 0.30,
+          vx: -s.vx * 0.13 + (Math.random() - 0.5) * spread * (1 + plume * 1.4),
+          vy: 0.7 + Math.random() * 1.5 * amt + plume * 0.9,
+          vz: -s.vz * 0.13 + (Math.random() - 0.5) * spread * (1 + plume * 1.4),
+          life: 0.34 + Math.random() * 0.38 * (0.5 + amt),
+          size0: 0.11 + Math.random() * 0.12,
+          size1: 0.50 + amt * 1.15 + Math.random() * 0.50,
+          alpha: (0.24 + amt * 0.24) * (1 - 0.45 * plume),
           color0: tint,
           color1: onGrass ? [0.52, 0.48, 0.36] : [0.86, 0.88, 0.94],
           rotV: (Math.random() - 0.5) * 2.6,

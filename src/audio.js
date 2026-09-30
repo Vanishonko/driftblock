@@ -11,8 +11,8 @@ export class GameAudio {
     this.ready = false;
     this.ctx = null;
     this.muted = false;
-    this.masterVol = 0.72;
-    this.engineVol = 1.0;     // separate trim: the engine dominates the mix
+    this.masterVol = 0.9;
+    this.engineVol = 1.15;    // separate trim: the engine dominates the mix
   }
 
   setMasterVolume(v) {
@@ -244,8 +244,9 @@ export class GameAudio {
     setF(this.oscLump, 0.5);
     setF(this.oscBright, 2);
 
-    // ---- level: quiet at idle, opens up under load
-    let vol = p.engineOn ? (0.035 + rpm01 * 0.115) * (0.28 + throttle * 0.72) : 0;
+    // ---- level. This is a loud, all-noise sort of engine on purpose: it
+    // should dominate the mix, not sit politely behind it.
+    let vol = p.engineOn ? (0.085 + rpm01 * 0.215) * (0.34 + throttle * 0.66) : 0;
 
     vol *= this.engineVol;
 
@@ -293,9 +294,10 @@ export class GameAudio {
     this.rumbleGain.gain.setTargetAtTime(rumbleAmt * 0.20, t, 0.06);
     this.rumbleLP.frequency.setTargetAtTime(220 + speed01 * 520, t, 0.08);
 
-    // ---- WIND: the single biggest cue for how fast you are actually going
+    // ---- WIND: the cue for how fast you are actually going. Kept well under
+    // the engine — it is a background rush, not a second engine.
     const w = Math.pow(clamp(speed01, 0, 1), 1.6);
-    this.windGain.gain.setTargetAtTime(w * 0.30 + p.boost * 0.10, t, 0.1);
+    this.windGain.gain.setTargetAtTime(w * 0.145 + p.boost * 0.05, t, 0.1);
     this.windHP.frequency.setTargetAtTime(420 + w * 1700, t, 0.1);
   }
 

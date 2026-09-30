@@ -201,3 +201,43 @@ for (const cfg of [
   console.log(`  ${cfg.label} : ${(v0 * 3.6).toFixed(0)} -> ${(sumSpd / n * 3.6).toFixed(0)} km/h  (${(sumSpd / n / v0 * 100).toFixed(0)}% kept)  holding ${deg(sumSlip / n).toFixed(0)} deg`);
 }
 console.log('');
+
+// ---------- 10. slide sustainability (donut -> countersteer + throttle) ----------
+console.log('\nSLIDE SUSTAIN  (donut, then countersteer and stay on the gas)');
+{
+  const s = new CarState();
+  let v = 0;
+  for (let g = 0; g < 4000 && v < 20; g++) {
+    stepCar(s, { steer: 0, throttle: 1, brake: 0, handbrake: 0, handbrakeEdge: false, boost: 0 }, dt, ROAD);
+    v = s.speed;
+  }
+  // light it up and spin a donut for 2.5 s
+  for (let i = 0; i < Math.round(2.5 / dt); i++) {
+    stepCar(s, {
+      steer: -1, throttle: 1, brake: 0, handbrake: i < Math.round(0.5 / dt) ? 1 : 0,
+      handbrakeEdge: i === 0, boost: 0,
+    }, dt, ROAD);
+  }
+  const donutSlip = s.absSlip;
+
+  // now unwind and countersteer, still hard on the throttle
+  const trace = [];
+  for (let i = 0; i < Math.round(2.5 / dt); i++) {
+    stepCar(s, { steer: 0.55, throttle: 1, brake: 0, handbrake: 0, handbrakeEdge: false, boost: 0 }, dt, ROAD);
+    if (i % Math.round(0.5 / dt) === 0) {
+      trace.push(`${(i * dt).toFixed(1)}s ${deg(s.absSlip).toFixed(0)}deg @${(s.speed * 3.6).toFixed(0)}km/h`);
+    }
+  }
+  console.log('  donut slip        :', deg(donutSlip).toFixed(0), 'deg');
+  console.log('  after countersteer:', trace.join('   '));
+  // hold it longer and report the settled angle, not the transient
+  let acc = 0, n = 0;
+  for (let i = 0; i < Math.round(2.0 / dt); i++) {
+    stepCar(s, { steer: 0.55, throttle: 1, brake: 0, handbrake: 0, handbrakeEdge: false, boost: 0 }, dt, ROAD);
+    acc += s.absSlip; n++;
+  }
+  const settled = acc / n;
+  console.log('  settled after 4.5s:', deg(settled).toFixed(0), 'deg @', (s.speed * 3.6).toFixed(0), 'km/h');
+  console.log('  ->', settled > 0.30 ? 'SLIDE HOLDS' : settled > 0.18 ? 'weak slide' : 'SNAPS BACK TO GRIP');
+}
+console.log('');

@@ -403,16 +403,19 @@ export class Game {
     if (!s.manual) { s.playerGear = s.gear; return; }
     if (s.shiftBlocked > 0) return;
 
-    const maxGear = TUNE.gearTops.length;
+    const maxGear = TUNE.gearRatios.length;
     const prev = s.gear;
 
     // An H-pattern shifter names a gear directly; paddles step by one.
     const req = input.gearRequest | 0;
-    if (req > 0 && req <= maxGear) {
+    if (req === 7) {
+      s.playerGear = 0;                      // H-pattern reverse gate
+    } else if (req > 0 && req <= maxGear) {
       s.playerGear = req;
     } else {
       if (input.shiftUp) s.playerGear = Math.min(maxGear, s.playerGear + 1);
-      if (input.shiftDown) s.playerGear = Math.max(1, s.playerGear - 1);
+      // shifting down past 1st selects reverse
+      if (input.shiftDown) s.playerGear = Math.max(0, s.playerGear - 1);
     }
 
     if (s.playerGear === prev) return;

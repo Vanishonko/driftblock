@@ -54,15 +54,17 @@ export const TUNE = {
 
   // ---- grip (exponential decay rate of lateral velocity, 1/s)
   gripNormal: 8.2,
-  gripPower: 2.20,        // throttle held mid-drift
+  gripPower: 1.95,
+  slideDecay: 0.85,      // how fast a slide re-plants once you stop asking
+  driftSustain: 0.56,    // how strongly throttle keeps the car rotating in a slide        // throttle held mid-drift
   gripCoast: 1.80,        // coasting mid-drift
   gripHandbrake: 1.70,
   // The rear tyres start to let go once the driver asks for a lot of yaw
   // *and* a lot of power at speed. Without this the "sliding" grip values
   // could only be reached after you were already sideways, which made the
   // handbrake the only way to start a drift.
-  gripDemandLo: 0.52,
-  gripDemandHi: 1.00,
+  gripDemandLo: 0.26,
+  gripDemandHi: 0.78,
   scrub: 9.0,             // m/s^2 lost at 90 deg of slip (scaled by speed)
 
   // ---- drivetrain
@@ -165,6 +167,7 @@ export class CarState {
     this.clutch = 0;
     this.clutchKick = 0;        // seconds of clutch-kick grip loss remaining
     this.wheelspin = 0;         // 0..1 how lit the rear tyres are
+    this.slideHold = 0;         // sticky slide state — see stepCar
     this.reverseHold = 0;       // brake held while stopped, to engage reverse
     this.limiterCut = 0;
     this.manual = false;        // false = automatic gearbox
@@ -199,7 +202,16 @@ export function updateDrivetrain(s, input, h) {
   if (s.manual) {
     // The driver is in charge. Nothing shifts on its own — that is the whole
     // point of having a shifter, and it lets you hold a gear through a corner
-    // instead of the box deciding for you.
+    // instead of the box deciding for you. Gear 0 is reverse.
+    if ((s.playerGear | 0) === 0) {
+      s.rpm01 = clamp(s.rpm01, 0, 1);
+      s.gear = 0;
+      s.gearT = 0;
+      s.clutchEngaged = 1 - clamp(((input.clutch || 0) - T.clutchEngageLo)
+        / (T.clutchEngageHi - T.clutchEngageLo), 0, 1);
+      s.wheelspin = Math.max(0, s.wheelspin - h * 3);
+      return s;
+    }
     g = clamp((s.playerGear | 0) - 1, 0, nGears - 1);
   } else {
     while (g < nGears - 1 && Math.abs(s.speed) > gearMaxSpeed(g) * 0.985) g++;
@@ -339,10 +351,24 @@ export function stepCar(s, input, dt, surf) {
   // slide or simply asking for too much — so a big handful of steering and
   // throttle will break traction on its own, and the handbrake becomes a
   // tool rather than a requirement.
-  const slideBlend = clamp(Math.max(
-    (absSlip - T.driftSlip * 0.45) / (T.driftSlip * 1.6),
-    (demand - T.gripDemandLo) / (T.gripDemandHi - T.gripDemandLo)
+  // Sticky. The instant the rear is loose it stays loose for a moment, even
+  // if the angle dips — otherwise grip returns the moment you stop asking,
+  // which makes the car snap straight the instant you countersteer and makes
+  // a slide impossible to hold on the throttle. It still recovers: lift off,
+  // straighten, and it decays back to planted in about a second.
+  // Throttle sustains a slide on its own. Countersteer is by definition LESS
+  // lock than the slide was initiated with, so a blend driven by steering
+  // angle alone reads "not drifting" exactly when you are holding the biggest
+  // angle — and re-plants the tyres. Once there is real slip and you are on
+  // the gas, the rear stays lit whatever the wheel is doing.
+  const sustain = clamp((absSlip - 0.07) / 0.25, 0, 1) * clamp(input.throttle, 0, 1) * 0.95;
+  const slideNow = clamp(Math.max(
+    (absSlip - T.driftSlip * 0.40) / (T.driftSlip * 1.30),
+    (demand - T.gripDemandLo) / (T.gripDemandHi - T.gripDemandLo),
+    sustain
   ), 0, 1);
+  s.slideHold = Math.max(slideNow, (s.slideHold || 0) - h * T.slideDecay);
+  const slideBlend = clamp(s.slideHold, 0, 1);
   let grip = hb
     ? T.gripHandbrake
     : T.gripNormal + (slideGrip - T.gripNormal) * slideBlend;
@@ -358,7 +384,13 @@ export function stepCar(s, input, dt, surf) {
   // ---------------------------------------------------------
   const authority = clamp(vf / T.yawRampSpeed, -1, 1);
   const highSpeedDamp = 1 - 0.48 * clamp(Math.abs(vf) / T.topSpeed, 0, 1);
-  let targetYaw = s.steer * T.maxYawRate * authority * highSpeedDamp;
+
+  // Once the car is properly sideways the front tyres are near their own
+  // limit, so steering has less and less say over yaw. Without this,
+  // countersteering commands the OPPOSITE yaw directly and simply erases
+  // the angle — you could never hold a slide on the throttle.
+  const yawAuthority = 1 - 0.42 * slideBlend;
+  let targetYaw = s.steer * T.maxYawRate * authority * highSpeedDamp * yawAuthority;
 
   // Self-aligning torque — the single most important term for making a
   // slide *catchable* instead of an instant spin. Because `vl` is measured
@@ -367,7 +399,20 @@ export function stepCar(s, input, dt, surf) {
   // the direction the car is actually travelling.
   const alignMul = hb ? T.alignHandbrake : 1.0;
   const alignSpeed = clamp(speed / 13, 0, 1);
-  targetYaw += slip * T.alignK * alignMul * alignSpeed;
+  // A spinning rear tyre generates no restoring force, so the self-aligning
+  // term has to fade as the slide develops. Left at full strength it keeps
+  // straightening the car using grip that the tyres are no longer providing.
+  const alignFade = 1 - 0.68 * slideBlend;
+  targetYaw += slip * T.alignK * alignMul * alignSpeed * alignFade;
+
+  // Power sustains the rotation. In a real drift the car keeps yawing INTO
+  // the corner and the countersteer only balances it — the yaw comes from a
+  // lit rear tyre, not from the steering. This model commands yaw straight
+  // off the steering angle, so without an explicit term the countersteer
+  // commands the opposite yaw, flips the rotation and snaps the car straight.
+  // slip and yawRate carry opposite signs here, hence the negation.
+  const driftSustain = T.driftSustain * clamp(input.throttle, 0, 1) * slideBlend * alignSpeed;
+  targetYaw -= clamp(slip / 0.12, -1, 1) * driftSustain * T.maxYawRate;
 
   // anti-spin limiter — past ~90 deg of slip the car would just
   // pirouette to a dead stop, which feels broken. Bleed the yaw off
@@ -396,7 +441,11 @@ export function stepCar(s, input, dt, surf) {
   // The gear ratio is the whole reason a short gear pulls and a tall one
   // bogs — without it every gear accelerated identically.
   let demanded = 0;
-  if (input.throttle > 0.01) {
+  if (input.throttle > 0.01 && s.gear === 0) {
+    // reverse gear: the throttle drives the car backwards
+    accel -= clamp(input.throttle, 0, 1) * T.reverseAccel
+      * (1 - clamp(-vf / T.maxReverse, 0, 1));
+  } else if (input.throttle > 0.01) {
     const ratio = T.gearRatios[clamp((s.gear | 0) - 1, 0, T.gearRatios.length - 1)];
     const clutchGate = s.clutchEngaged !== undefined ? s.clutchEngaged : 1;
     // power is briefly cut during a gear change, which gives the drivetrain
@@ -433,25 +482,15 @@ export function stepCar(s, input, dt, surf) {
     accel += Math.min(demanded, gripAvail * 1.35) * (1 - T.wheelspinGripLoss * s.wheelspin);
   }
 
-  // ---- reverse.
-  // Braking at a standstill used to drop straight into reverse, so you could
-  // never simply sit still. Reverse now needs the brake held while stopped,
-  // and stays engaged once you are actually rolling backwards.
-  const nearlyStopped = Math.abs(vf) < 0.8;
-  if (input.brake > 0.1 && nearlyStopped) s.reverseHold += h;
-  else if (input.brake < 0.1) s.reverseHold = 0;
-  const reversing = vf < -0.5 || s.reverseHold > T.reverseHoldTime;
-  s.reversing = reversing;
-  s.reverseCharge = clamp(s.reverseHold / T.reverseHoldTime, 0, 1);
-
+  // ---- brakes.
+  // Reverse is NOT reachable from the brake pedal. Braking to a stop, or
+  // standing on the brake to light the tyres up, must never put you in
+  // reverse. Reverse is a gear: select it in manual (shift down past 1st,
+  // or the R gate on an H-pattern). Auto has no reverse — use reset.
   if (input.brake > 0.01) {
-    if (vf > 0.4) {
-      accel -= input.brake * T.brakeAccel;
-    } else if (reversing) {
-      accel -= input.brake * T.reverseAccel * (1 - clamp(-vf / T.maxReverse, 0, 1));
-    }
-    // otherwise the brakes are just holding the car — which is exactly what
-    // lets you stand on the brake and light the tyres up
+    if (vf > 0.4) accel -= input.brake * T.brakeAccel;
+    else if (s.gear === 0 && vf < -0.4) accel += input.brake * T.brakeAccel;
+    // otherwise the brakes simply hold the car
   }
 
   // a burnout should stay put rather than creep: the brakes win
