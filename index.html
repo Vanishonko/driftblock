@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<meta name="theme-color" content="#0b0d1a" />
+<title>DRIFTBLOCK — 3D Drift Racing</title>
+<link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+<link rel="stylesheet" href="./src/style.css" />
+</head>
+<body>
+<div id="app">
+  <canvas id="gl"></canvas>
+
+  <!-- ===================== HUD ===================== -->
+  <div id="hud" class="hidden" aria-hidden="true">
+
+    <div id="topbar">
+      <div class="tb-cell">
+        <span class="tb-label" id="modeLabel">DRIFT ATTACK</span>
+      </div>
+      <div class="tb-cell tb-center">
+        <span class="tb-big" id="timerValue">1:30.00</span>
+        <span class="tb-label">TIME</span>
+      </div>
+      <div class="tb-cell tb-right">
+        <span class="tb-big" id="lapValue">1/3</span>
+        <span class="tb-label" id="lapLabel">LAP</span>
+      </div>
+    </div>
+
+    <div id="driftPanel">
+      <div id="multWrap">
+        <span id="multValue">x1</span>
+      </div>
+      <div id="driftScoreWrap">
+        <span id="driftScore">0</span>
+        <span id="driftLabel">DRIFT</span>
+      </div>
+      <div id="chainBar"><i id="chainFill"></i></div>
+      <div id="chargeRow">
+        <div id="chargeBar"><i id="chargeFill"></i></div>
+        <span id="chargeLabel">BOOST</span>
+      </div>
+    </div>
+
+    <div id="totalWrap">
+      <span class="tb-label">SCORE</span>
+      <span id="totalScore">0</span>
+    </div>
+
+    <canvas id="gauge" width="520" height="520"></canvas>
+    <div id="mapWrap"><canvas id="minimap" width="440" height="440"></canvas></div>
+
+    <div id="popups"></div>
+
+    <div id="hints">
+      <div><b>W</b>/<b>S</b> throttle &amp; brake &nbsp;·&nbsp; <b>A</b>/<b>D</b> steer &nbsp;·&nbsp; <b>SPACE</b> handbrake</div>
+      <div><b>SHIFT</b> mini-turbo &nbsp;·&nbsp; <b>R</b> reset &nbsp;·&nbsp; <b>C</b> camera &nbsp;·&nbsp; <b>ESC</b> pause</div>
+      <div class="hint-wheel">Wheel: clutch kicks the rear loose &nbsp;·&nbsp; <b>E</b>/<b>Q</b> shift in manual &nbsp;·&nbsp; set up in WHEEL &amp; FORCE FEEDBACK</div>
+    </div>
+
+    <div id="toast"></div>
+  </div>
+
+  <!-- ===================== TOUCH ===================== -->
+  <div id="touch" class="hidden">
+    <div id="stickZone"><div id="stickBase"><div id="stickNub"></div></div></div>
+    <div id="touchBtns">
+      <button class="tbtn" id="btnBrake">BRAKE</button>
+      <button class="tbtn tbtn-wide" id="btnHand">DRIFT</button>
+      <button class="tbtn" id="btnBoost">BOOST</button>
+    </div>
+  </div>
+
+  <!-- ===================== OVERLAY / MENUS ===================== -->
+  <div id="overlay">
+
+    <!-- Title -->
+    <section class="screen" id="screenTitle">
+      <div class="title-block">
+        <h1 class="logo">DRIFT<span>BLOCK</span></h1>
+        <p class="tagline">a blocky 3d drift machine</p>
+      </div>
+      <div class="menu">
+        <button class="btn btn-primary" data-action="start">START ENGINE</button>
+        <button class="btn" data-action="garage">GARAGE</button>
+        <button class="btn" data-action="wheel">WHEEL &amp; FORCE FEEDBACK</button>
+        <button class="btn" data-action="howto">HOW TO DRIFT</button>
+        <button class="btn btn-ghost" data-action="wipe">RESET PROGRESS</button>
+      </div>
+      <div class="best-strip" id="bestStrip"></div>
+    </section>
+
+    <!-- Mode select -->
+    <section class="screen hidden" id="screenMode">
+      <h2 class="screen-title">SELECT MODE</h2>
+      <div class="cards" id="modeCards"></div>
+      <div class="menu">
+        <button class="btn" data-action="back">BACK</button>
+      </div>
+    </section>
+
+    <!-- Track select -->
+    <section class="screen hidden" id="screenTrack">
+      <h2 class="screen-title">SELECT TRACK</h2>
+      <div class="cards" id="trackCards"></div>
+      <div class="menu">
+        <button class="btn" data-action="back">BACK</button>
+      </div>
+    </section>
+
+    <!-- Garage -->
+    <section class="screen hidden" id="screenGarage">
+      <h2 class="screen-title">GARAGE</h2>
+      <div class="cards" id="paintCards"></div>
+      <div class="cards" id="tuneCards"></div>
+      <div class="settings-block">
+        <h3 class="settings-title">AUDIO</h3>
+        <div id="audioCards"></div>
+      </div>
+      <div class="settings-block">
+        <h3 class="settings-title">DISPLAY</h3>
+        <div id="displayCards"></div>
+      </div>
+      <div class="menu">
+        <button class="btn" data-action="back">BACK</button>
+      </div>
+    </section>
+
+    <!-- Wheel setup -->
+    <section class="screen screen-wide hidden" id="screenWheel">
+      <h2 class="screen-title">WHEEL &amp; FORCE FEEDBACK</h2>
+      <div id="wheelBody"></div>
+      <div class="menu">
+        <button class="btn" data-action="back">BACK</button>
+      </div>
+    </section>
+
+    <!-- How to -->
+    <section class="screen hidden" id="screenHow">
+      <h2 class="screen-title">HOW TO DRIFT</h2>
+      <div class="howto">
+        <div class="how-row"><b>1</b><p>Build speed on the straight. Faster entry means a bigger slide — and a bigger score.</p></div>
+        <div class="how-row"><b>2</b><p>Turn in, then tap <kbd>SPACE</kbd> (handbrake) to break the rear loose. The car will rotate far more than it travels.</p></div>
+        <div class="how-row"><b>3</b><p>Hold the slide with <kbd>W</kbd>. Throttle keeps the rear wheels spinning and the drift alive. Steer <em>into</em> the slide to control your angle.</p></div>
+        <div class="how-row"><b>4</b><p>Watch the <span class="c-accent">BOOST</span> bar. The longer you hold a clean drift, the more charge you bank. Let go of the handbrake to fire a mini-turbo.</p></div>
+        <div class="how-row"><b>5</b><p>Your multiplier climbs every 2 seconds of unbroken drift. <span class="c-good">Straightening out banks the points.</span> <span class="c-bad">Hitting a wall burns the whole chain.</span></p></div>
+        <div class="how-row"><b>6</b><p><b>Got a clutch pedal?</b> Press it, let the revs build, then dump it. The rear tyres break loose instantly — a third way in, alongside the handbrake and sheer throttle.</p></div>
+        <div class="how-row"><b>7</b><p>Slip angle is everything. Shallow drifts are safe; huge angles score enormously but bleed speed fast.</p></div>
+      </div>
+      <div class="menu">
+        <button class="btn" data-action="back">BACK</button>
+      </div>
+    </section>
+
+    <!-- Pause -->
+    <section class="screen hidden" id="screenPause">
+      <h2 class="screen-title">PAUSED</h2>
+      <div class="menu">
+        <button class="btn btn-primary" data-action="resume">RESUME</button>
+        <button class="btn" data-action="restart">RESTART</button>
+        <button class="btn" data-action="quit">QUIT TO MENU</button>
+      </div>
+    </section>
+
+    <!-- Results -->
+    <section class="screen hidden" id="screenResults">
+      <h2 class="screen-title" id="resultsTitle">RUN COMPLETE</h2>
+      <div id="resultsBody"></div>
+      <div class="menu">
+        <button class="btn btn-primary" data-action="restart">RUN IT AGAIN</button>
+        <button class="btn" data-action="quit">MENU</button>
+      </div>
+    </section>
+  </div>
+
+  <div id="rotate"></div>
+  <div id="loading"><div class="load-bar"><i></i></div><span>BUILDING WORLD</span></div>
+</div>
+
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>

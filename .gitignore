@@ -1,0 +1,19 @@
+# ---- dependencies (regenerate with `npm install` in tools/ffb) ----
+node_modules/
+package-lock.json
+
+# ---- macOS ----
+.DS_Store
+._*
+.Spotlight-V100
+.Trashes
+
+# ---- editors ----
+.vscode/
+.idea/
+*.swp
+*~
+
+# ---- logs / scratch ----
+*.log
+npm-debug.log*

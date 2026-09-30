@@ -1,0 +1,14 @@
+{
+  "name": "driftblock-ffb",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Native force-feedback bridge for DRIFTBLOCK. Optional \u2014 the game runs fine without it.",
+  "scripts": {
+    "start": "node bridge.mjs",
+    "probe": "node bridge.mjs --probe"
+  },
+  "dependencies": {
+    "node-hid": "^3.4.0"
+  }
+}

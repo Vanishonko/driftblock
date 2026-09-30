@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" shape-rendering="crispEdges">
+  <rect width="64" height="64" fill="#0b0d1a"/>
+  <!-- skid trail -->
+  <rect x="6" y="44" width="10" height="3" fill="#2fe0ff" opacity=".55"/>
+  <rect x="4" y="49" width="14" height="3" fill="#2fe0ff" opacity=".35"/>
+  <rect x="8" y="54" width="8" height="3" fill="#2fe0ff" opacity=".2"/>
+  <!-- car body -->
+  <rect x="16" y="26" width="34" height="14" fill="#ff2e7e"/>
+  <rect x="22" y="16" width="20" height="11" fill="#ff2e7e"/>
+  <rect x="25" y="18" width="14" height="6" fill="#0d1220"/>
+  <!-- wing -->
+  <rect x="14" y="20" width="7" height="3" fill="#ffcc33"/>
+  <rect x="16" y="22" width="2" height="5" fill="#2b0f1e"/>
+  <!-- stripe + wheels -->
+  <rect x="16" y="32" width="34" height="3" fill="#ffcc33"/>
+  <rect x="20" y="39" width="8" height="7" fill="#14161d"/>
+  <rect x="39" y="39" width="8" height="7" fill="#14161d"/>
+  <!-- headlight -->
+  <rect x="48" y="29" width="4" height="4" fill="#fff6d0"/>
+</svg>
