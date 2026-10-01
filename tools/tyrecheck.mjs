@@ -28,7 +28,7 @@ import { applySpec } from '../src/physics/specs.js';
 const dt = 1 / 120, ROAD = TUNE.surface.road;
 const inp = (o = {}) => ({ steer: 0, throttle: 0, brake: 0, handbrake: 0, handbrakeEdge: false, boost: 0, ...o });
 const deg = (r) => (r * 57.2958);
-const hold = (s, sec, input) => { for (let i = 0; i < Math.round(sec / dt); i++) stepCar(s, input, dt, ROAD); };
+const hold = (s, sec, input, surf = ROAD) => { for (let i = 0; i < Math.round(sec / dt); i++) stepCar(s, input, dt, surf); };
 
 /**
  * Accelerate until a target speed, with a hard cap. A bare `while (v < 30)`
@@ -99,11 +99,15 @@ console.log('\nDONUT  (full lock + throttle, 0.5 s of handbrake to light it)');
 console.log('\nSLIDE SUSTAIN  (donut, then countersteer and stay on the gas)');
 {
   const s = spinUp(20, { throttle: 1 });
-  hold(s, 2.5, inp({ steer: -1, throttle: 1, handbrake: 1, handbrakeEdge: true }));
-  hold(s, 2.5, inp({ steer: 0.55, throttle: 1, handbrake: 0 }));
+  // light it and spin a donut, then release the handbrake — holding it down
+  // for the whole time just spins the car onto its side of the limit
+  hold(s, 0.5, inp({ steer: -1, throttle: 1, handbrake: 1, handbrakeEdge: true }));
+  hold(s, 2.0, inp({ steer: -1, throttle: 1 }));
+  const donutSlip = deg(s.absSlip);
+  hold(s, 2.5, inp({ steer: 0.55, throttle: 1 }));
   const settled = deg(s.absSlip);
   check('the slide survives countersteer on the throttle', settled > 17,
-    `${settled.toFixed(0)} deg`);
+    `${donutSlip.toFixed(0)} deg donut -> ${settled.toFixed(0)} deg after countersteer`);
 }
 
 /* ---- 5. recovery is still possible --------------------------- */
@@ -207,20 +211,30 @@ console.log('\nPERTURBED LAUNCH  (same, but with steering — should step out)')
 }
 
 /* ---- 11. a wet surface slides where a dry one grips ---------- */
-console.log('\nWET SURFACE  (same input, less grip)');
+console.log('\nWET SURFACE  (the same gentle input, less grip)');
 {
   const wet = TUNE.surface.wet;
   if (!wet) {
-    console.log('  SKIP  no wet surface in the tune yet — added with the tyre model');
+    console.log('  SKIP  no wet surface in the tune yet');
   } else {
+    // Part throttle on purpose, and measured as a sustained average rather
+    // than one instant. At full throttle the dry car is already at the limit
+    // of its grip, so there is nothing left for the wet to take away — the
+    // difference only shows on an input the dry tyres can actually take. And
+    // a single sample lands wherever the slide happens to be in its cycle.
     const run = (surf) => {
       const s = spinUp(30, { throttle: 1 }, surf);
-      hold(s, 3.0, inp({ throttle: 1, steer: 0.55 }), surf);
-      return deg(s.absSlip);
+      hold(s, 3.0, inp({ throttle: 0.5, steer: 0.40 }), surf);
+      let acc = 0, n = 0;
+      for (let i = 0; i < Math.round(1.5 / dt); i++) {
+        stepCar(s, inp({ throttle: 0.5, steer: 0.40 }), dt, surf);
+        acc += s.absSlip; n++;
+      }
+      return deg(acc / n);
     };
     const drySlip = run(ROAD);
     const wetSlip = run(wet);
-    target('the same input slides more in the wet', wetSlip > drySlip + 5,
+    check('an input the dry tyres take slides in the wet', wetSlip > drySlip + 15,
       `${wetSlip.toFixed(0)} deg wet vs ${drySlip.toFixed(0)} deg dry`);
   }
 }

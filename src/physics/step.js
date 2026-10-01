@@ -9,6 +9,7 @@
 import { TUNE } from './tune.js';
 import { clamp, sign } from './math.js';
 import { updateDrivetrain, engineTorque } from './drivetrain.js';
+import { tyreForces } from './tyres.js';
 
 export function stepCar(s, input, dt, surf) {
   const T = TUNE;
@@ -40,108 +41,19 @@ export function stepCar(s, input, dt, surf) {
   // 3. LATERAL GRIP
   // ---------------------------------------------------------
   const hb = input.handbrake > 0.5;
-  const slideGrip = input.throttle > 0.35 ? T.gripPower : T.gripCoast;
-  // how hard the driver is asking the rear tyres to work
-  const demand = Math.abs(s.steer)
-    * clamp(Math.abs(vf) / 18, 0, 1)
-    * clamp(input.throttle, 0, 1);
-  // blend smoothly from planted to sliding, driven by EITHER an existing
-  // slide or simply asking for too much — so a big handful of steering and
-  // throttle will break traction on its own, and the handbrake becomes a
-  // tool rather than a requirement.
-  // Sticky. The instant the rear is loose it stays loose for a moment, even
-  // if the angle dips — otherwise grip returns the moment you stop asking,
-  // which makes the car snap straight the instant you countersteer and makes
-  // a slide impossible to hold on the throttle. It still recovers: lift off,
-  // straighten, and it decays back to planted in about a second.
-  // Throttle sustains a slide on its own. Countersteer is by definition LESS
-  // lock than the slide was initiated with, so a blend driven by steering
-  // angle alone reads "not drifting" exactly when you are holding the biggest
-  // angle — and re-plants the tyres. Once there is real slip and you are on
-  // the gas, the rear stays lit whatever the wheel is doing.
-  const sustain = clamp((absSlip - 0.07) / 0.25, 0, 1) * clamp(input.throttle, 0, 1) * 0.95;
-  const slideNow = clamp(Math.max(
-    (absSlip - T.driftSlip * 0.40) / (T.driftSlip * 1.30),
-    (demand - T.gripDemandLo) / (T.gripDemandHi - T.gripDemandLo),
-    sustain
-  ), 0, 1);
-  s.slideHold = Math.max(slideNow, (s.slideHold || 0) - h * T.slideDecay);
-  const slideBlend = clamp(s.slideHold, 0, 1);
-  let grip = hb
-    ? T.gripHandbrake
-    : T.gripNormal + (slideGrip - T.gripNormal) * slideBlend;
-  // a dumped clutch briefly unhooks the rear, like a lighter handbrake
-  if (s.clutchKick > 0) {
-    const k = s.clutchKick / T.clutchKickTime;
-    grip = Math.min(grip, T.gripNormal * (1 - k) + T.gripHandbrake * T.clutchKickGrip * k);
-  }
-  grip *= surf.grip;
 
   // ---------------------------------------------------------
-  // 4. YAW
+  // 3. WHAT THE ENGINE IS ASKING THE REAR TYRES FOR
   // ---------------------------------------------------------
-  const authority = clamp(vf / T.yawRampSpeed, -1, 1);
-  const highSpeedDamp = 1 - 0.48 * clamp(Math.abs(vf) / T.topSpeed, 0, 1);
-
-  // Once the car is properly sideways the front tyres are near their own
-  // limit, so steering has less and less say over yaw. Without this,
-  // countersteering commands the OPPOSITE yaw directly and simply erases
-  // the angle — you could never hold a slide on the throttle.
-  const yawAuthority = 1 - 0.42 * slideBlend;
-  let targetYaw = s.steer * T.maxYawRate * authority * highSpeedDamp * yawAuthority;
-
-  // Self-aligning torque — the single most important term for making a
-  // slide *catchable* instead of an instant spin. Because `vl` is measured
-  // along the yaw-positive axis, a car yawing positively develops negative
-  // slip, so the restoring term is +slip: it pulls the heading back toward
-  // the direction the car is actually travelling.
-  const alignMul = hb ? T.alignHandbrake : 1.0;
-  const alignSpeed = clamp(speed / 13, 0, 1);
-  // A spinning rear tyre generates no restoring force, so the self-aligning
-  // term has to fade as the slide develops. Left at full strength it keeps
-  // straightening the car using grip that the tyres are no longer providing.
-  const alignFade = 1 - 0.68 * slideBlend;
-  targetYaw += slip * T.alignK * alignMul * alignSpeed * alignFade;
-
-  // Power sustains the rotation. In a real drift the car keeps yawing INTO
-  // the corner and the countersteer only balances it — the yaw comes from a
-  // lit rear tyre, not from the steering. This model commands yaw straight
-  // off the steering angle, so without an explicit term the countersteer
-  // commands the opposite yaw, flips the rotation and snaps the car straight.
-  // slip and yawRate carry opposite signs here, hence the negation.
-  const driftSustain = T.driftSustain * clamp(input.throttle, 0, 1) * slideBlend * alignSpeed;
-  targetYaw -= clamp(slip / 0.12, -1, 1) * driftSustain * T.maxYawRate;
-
-  // anti-spin limiter — past ~90 deg of slip the car would just
-  // pirouette to a dead stop, which feels broken. Bleed the yaw off
-  // so a mistake costs you speed and angle, not the whole run.
-  if (absSlip > T.spinLimit) {
-    const over = absSlip - T.spinLimit;
-    targetYaw *= clamp(1 - over / 0.42, 0, 1);
-    targetYaw -= sign(slip) * over * T.spinRecover;
-  }
-
-  // handbrake flick — snaps the car sideways on pull
-  if (input.handbrakeEdge && speed > 7) {
-    s.yawRate += s.steer * T.handbrakeKick * clamp(speed / 22, 0, 1.15);
-  }
-
-  s.yawRate += (targetYaw - s.yawRate) * (1 - Math.exp(-T.yawResponse * h));
-  s.yaw += s.yawRate * h;
-
-  // ---------------------------------------------------------
-  // 5. LONGITUDINAL
-  // ---------------------------------------------------------
-  let accel = 0;
+  // Computed here, before yaw and before the longitudinal step, because
+  // both of them need the answer. The gear ratio is the whole reason a
+  // short gear pulls and a tall one bogs; the revs and gear come from last
+  // step's drivetrain update, which is one frame of lag at 120 Hz.
   const power = surf.power;
-
-  // How much force the engine is asking the rear tyres for, in m/s^2.
-  // The gear ratio is the whole reason a short gear pulls and a tall one
-  // bogs — without it every gear accelerated identically.
   let demanded = 0;
   if (input.throttle > 0.01 && s.gear === -1) {
     // reverse gear: the throttle drives the car backwards
-    accel -= clamp(input.throttle, 0, 1) * T.reverseAccel
+    demanded = -clamp(input.throttle, 0, 1) * T.reverseAccel
       * (1 - clamp(-vf / T.maxReverse, 0, 1));
   } else if (input.throttle > 0.01) {
     const ratio = T.gearRatios[clamp((s.gear | 0) - 1, 0, T.gearRatios.length - 1)];
@@ -160,42 +72,118 @@ export function stepCar(s, input, dt, surf) {
       * power * clutchGate * shifting;
   }
 
-  // ---- traction: what the tyres will actually take
-  const gripAvail = T.tractionLimit * surf.grip
-    * (1 - 0.25 * clamp(Math.abs(s.absSlip) / 1.0, 0, 1));
+  // ---------------------------------------------------------
+  // 4. THE FRICTION CIRCLE
+  // ---------------------------------------------------------
+  // The tyres have a fixed amount of grip and must share it between going
+  // and turning. The lateral ask is what the cornering grip is being asked to
+  // produce right now: the base rate times how much sideways velocity there
+  // is to remove.
+  const aLatReq = T.gripBase * Math.abs(vl);
+  const tyre = tyreForces({
+    longDemand: Math.abs(demanded) + (hb ? T.handbrakeDecel * input.handbrake : 0),
+    latDemand: aLatReq,
+    absSlip,
+    surfGrip: surf.grip,
+    lockup: hb ? input.handbrake : 0,
+    slideState: s.tyreSlide,
+  });
 
-  // A brake stand. Standing on the brake with the throttle down overwhelms
-  // the REAR brakes long before the fronts give up, so the car keeps rolling
-  // while the rear tyres spin — a rolling burnout rather than a stop. The
-  // braking force is shared mostly to the front to model that.
-  const brakeStand = input.brake > T.burnoutBrake && input.throttle > 0.3;
-  const brakeShare = brakeStand ? 0.26 : 1;
+  // How overloaded the tyres are, 0..1. This is the single measure that used
+  // to be five: throttle blend, handbrake override, clutch-kick timer and the
+  // rest all reduce to "the tyres are being asked for more than they have".
+  const overload = clamp((tyre.load - 1) / T.tyreOverloadSpan, 0, 1);
 
-  let spinTarget = 0;
-  if (demanded > gripAvail) {
-    spinTarget = clamp((demanded - gripAvail) / Math.max(1, gripAvail), 0, 1);
-  }
-  if (brakeStand) {
-    // full wheelspin when stationary, easing off as speed builds, but never
-    // dropping away to nothing — this is the whole point of the move
-    const rolling = 1 - clamp(Math.abs(vf) / T.rollingBurnoutSpeed, 0, 1);
-    spinTarget = Math.max(spinTarget, 0.45 + rolling * 0.55);
-  }
-  const spinRate = spinTarget > s.wheelspin ? T.wheelspinRise : T.wheelspinFall;
-  s.wheelspin += (spinTarget - s.wheelspin) * (1 - Math.exp(-spinRate * h));
+  // Sticky: it rises the instant the tyres are overloaded and bleeds off
+  // slowly, so a slide survives the moment of countersteer that used to end it.
+  s.tyreSlide = Math.max(overload, s.tyreSlide - h * T.tyreRegripRate);
+  const grip = tyre.gripRate;
 
-  if (demanded > 0) {
-    // a spinning tyre pushes less than a gripping one
-    accel += Math.min(demanded, gripAvail * 1.35) * (1 - T.wheelspinGripLoss * s.wheelspin);
+  // Longitudinal slip follows the load, and is what the smoke, the skid marks,
+  // the engine note and the tacho all read.
+  const spinRate = tyre.slipTarget > s.wheelspin ? T.wheelspinRise : T.wheelspinFall;
+  s.wheelspin += (tyre.slipTarget - s.wheelspin) * (1 - Math.exp(-spinRate * h));
+  // A spinning tyre is not a gripping one: keep the two in step so the HUD,
+  // the effects and the physics never disagree about what the car is doing.
+  s.wheelspin = Math.max(s.wheelspin, (tyre.slipTarget - s.wheelspin) * 0.5);
+
+  // ---------------------------------------------------------
+  // 4. YAW
+  // ---------------------------------------------------------
+  const authority = clamp(vf / T.yawRampSpeed, -1, 1);
+  const highSpeedDamp = 1 - 0.48 * clamp(Math.abs(vf) / T.topSpeed, 0, 1);
+
+  // Once the car is properly sideways the front tyres are near their own
+  // limit, so steering has less and less say over yaw. Without this,
+  // countersteering commands the OPPOSITE yaw directly and simply erases
+  // the angle — you could never hold a slide on the throttle.
+  const yawAuthority = 1 - 0.42 * s.tyreSlide;
+  let targetYaw = s.steer * T.maxYawRate * authority * highSpeedDamp * yawAuthority;
+
+  // Self-aligning torque — the single most important term for making a
+  // slide *catchable* instead of an instant spin. Because `vl` is measured
+  // along the yaw-positive axis, a car yawing positively develops negative
+  // slip, so the restoring term is +slip: it pulls the heading back toward
+  // the direction the car is actually travelling.
+  const alignMul = hb ? T.alignHandbrake : 1.0;
+  const alignSpeed = clamp(speed / 13, 0, 1);
+  // A spinning rear tyre generates no restoring force, so the self-aligning
+  // term has to fade as the slide develops. Left at full strength it keeps
+  // straightening the car using grip that the tyres are no longer providing.
+  const alignFade = 1 - 0.68 * s.tyreSlide;
+  targetYaw += slip * T.alignK * alignMul * alignSpeed * alignFade;
+
+  // Power sustains the rotation. In a real drift the car keeps yawing INTO
+  // the corner and the countersteer only balances it — the yaw comes from a
+  // lit rear tyre, not from the steering. This model commands yaw straight
+  // off the steering angle, so without an explicit term the countersteer
+  // commands the opposite yaw, flips the rotation and snaps the car straight.
+  // slip and yawRate carry opposite signs here, hence the negation.
+  //
+  // Driven by `overload`, which is now the friction circle's own output: the
+  // car rotates because the rear tyres are out of grip, not because a
+  // separate "drift sustain" constant says so.
+  const driftSustain = T.driftSustain * clamp(input.throttle, 0, 1) * s.tyreSlide * alignSpeed;
+  targetYaw -= clamp(slip / 0.12, -1, 1) * driftSustain * T.maxYawRate;
+
+  // anti-spin limiter — past ~90 deg of slip the car would just
+  // pirouette to a dead stop, which feels broken. Bleed the yaw off
+  // so a mistake costs you speed and angle, not the whole run.
+  if (absSlip > T.spinLimit) {
+    const over = absSlip - T.spinLimit;
+    targetYaw *= clamp(1 - over / 0.42, 0, 1);
+    targetYaw -= sign(slip) * over * T.spinRecover;
   }
+
+  s.yawRate += (targetYaw - s.yawRate) * (1 - Math.exp(-T.yawResponse * h));
+  s.yaw += s.yawRate * h;
+
+  // ---------------------------------------------------------
+  // 5. LONGITUDINAL
+  // ---------------------------------------------------------
+  let accel = 0;
+
+  // The engine's contribution is whatever survived the friction circle. A
+  // spinning tyre puts down less than the engine asked for, and that falls
+  // out of the same relationship that took its cornering grip away.
+  //
+  // The circle works in magnitudes — it does not care which way the car is
+  // going — so the sign has to be put back on here. Without this, reverse
+  // drove forwards.
+  accel += demanded < 0 ? -tyre.drive : tyre.drive;
 
   // ---- brakes.
   // Reverse is NOT reachable from the brake pedal. Braking to a stop, or
   // standing on the brake to light the tyres up, must never put you in
   // reverse. Reverse is a gear: select it in manual (shift down past 1st,
   // or the R gate on an H-pattern). Auto has no reverse — use reset.
+  //
+  // Standing on the brake with the throttle down overwhelms the REAR brakes
+  // long before the fronts give up, so the car keeps rolling while the rear
+  // tyres spin. That is a rolling burnout, and it needs no special case: the
+  // rear lock is already part of what the circle is asked for.
   if (input.brake > 0.01) {
-    if (vf > 0.4) accel -= input.brake * T.brakeAccel * brakeShare;
+    if (vf > 0.4) accel -= input.brake * T.brakeAccel;
     else if (s.gear === -1 && vf < -0.4) accel += input.brake * T.brakeAccel;
     // otherwise the brakes simply hold the car
   }
@@ -206,10 +194,6 @@ export function stepCar(s, input, dt, surf) {
   }
 
   if (hb) accel -= sign(vf) * T.handbrakeDecel * input.handbrake;
-
-  // mini-turbo — sustained shove plus massively reduced drag
-  // the clutch kick lands a slug of torque the instant it bites
-  if (s.clutchKick > 0) accel += T.clutchKickTorque * (s.clutchKick / T.clutchKickTime);
 
   const boosting = s.boost > 0;
   if (boosting) {
@@ -224,6 +208,7 @@ export function stepCar(s, input, dt, surf) {
   vf -= vf * Math.abs(vf) * T.dragQuad * (boosting ? T.boostDragMul : 1) * h;
   vf -= sign(vf) * Math.min(Math.abs(vf), T.rollResist * surf.roll * h);
   vf -= sign(vf) * Math.min(Math.abs(vf), surf.dragAccel * h);
+
 
   // ---------------------------------------------------------
   // 6. LATERAL FRICTION — the tyres rotate the velocity vector

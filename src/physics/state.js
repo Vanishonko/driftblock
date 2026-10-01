@@ -40,7 +40,7 @@ export class CarState {
     this.clutch = 0;
     this.clutchKick = 0;        // seconds of clutch-kick grip loss remaining
     this.wheelspin = 0;         // 0..1 how lit the rear tyres are
-    this.slideHold = 0;         // sticky slide state — see stepCar
+    this.tyreSlide = 0;         // 0..1, how far the tyres are already away
     this.reverseHold = 0;       // brake held while stopped, to engage reverse
     this.limiterCut = 0;
     this.manual = false;        // false = automatic gearbox
