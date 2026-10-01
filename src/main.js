@@ -11,7 +11,7 @@ import { ChaseCamera } from './camera.js';
 import { Effects } from './effects.js';
 import { HUD } from './hud.js';
 import { Game, MODES, fmtTime, SCORE } from './game.js';
-import { TUNE, clamp, invalidateTopSpeed } from './physics.js';
+import { TUNE, clamp, invalidateTopSpeed } from './physics/index.js';
 import { load as loadSettings, patch as patchSettings, flush as flushSettings } from './core/settings.js';
 import { SPECS, applySpec } from './physics/specs.js';
 import { WheelInput, defaultCalibration } from './wheel.js';

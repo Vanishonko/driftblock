@@ -15,7 +15,7 @@
    game feels alive on a pad and correct on a wheel.
    ============================================================ */
 
-import { clamp } from './physics.js';
+import { clamp } from './physics/index.js';
 
 /* ============================================================
    TORQUE MODEL

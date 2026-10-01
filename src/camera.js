@@ -65,7 +65,7 @@ export class ChaseCamera {
 
   /**
    * @param {number} dt
-   * @param {import('./physics.js').CarState} s
+   * @param {import('./physics/index.js').CarState} s
    * @param {object} extra { boost:0..1, tier, reversing }
    */
   update(dt, s, extra = {}) {

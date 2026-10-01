@@ -5,7 +5,7 @@
    ============================================================ */
 
 import * as THREE from '../vendor/three.module.js';
-import { TUNE } from './physics.js';
+import { TUNE } from './physics/index.js';
 
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 
@@ -174,7 +174,7 @@ export function createCarMesh(paint) {
 /**
  * Drive the visuals from physics state.
  * @param {object} car result of createCarMesh
- * @param {import('./physics.js').CarState} s
+ * @param {import('./physics/index.js').CarState} s
  * @param {object} input
  * @param {number} dt
  * @param {boolean} onGrass

@@ -22,7 +22,7 @@
    Run: node tools/tyrecheck.mjs
    ============================================================ */
 
-import { CarState, stepCar, TUNE } from '../src/physics.js';
+import { CarState, stepCar, TUNE } from '../src/physics/index.js';
 import { applySpec } from '../src/physics/specs.js';
 
 const dt = 1 / 120, ROAD = TUNE.surface.road;

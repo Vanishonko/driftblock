@@ -3,7 +3,7 @@
    lap timing and run lifecycle.
    ============================================================ */
 
-import { CarState, stepCar, TUNE, engineRpm01, fireBoost, clamp } from './physics.js';
+import { CarState, stepCar, TUNE, engineRpm01, fireBoost, clamp } from './physics/index.js';
 
 export const MODES = [
   {

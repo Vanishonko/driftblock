@@ -19,7 +19,7 @@
       unknown wheel for the learning wizard.
    ============================================================ */
 
-import { CarState, stepCar, TUNE, clamp } from '../src/physics.js';
+import { CarState, stepCar, TUNE, clamp } from '../src/physics/index.js';
 import { computeForce, aligningShape, FFB_DEFAULTS } from '../src/ffb.js';
 import {
   WheelInput, WheelLearner, looksLikeWheel, detectPreset,

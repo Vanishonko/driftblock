@@ -3,7 +3,7 @@
    Simulates the car with synthetic inputs and reports the numbers
    that actually decide whether a drift game feels good. */
 
-import { CarState, stepCar, TUNE, engineRpm01, fireBoost } from '../src/physics.js';
+import { CarState, stepCar, TUNE, engineRpm01, fireBoost } from '../src/physics/index.js';
 
 const ROAD = TUNE.surface.road;
 const GRASS = TUNE.surface.grass;

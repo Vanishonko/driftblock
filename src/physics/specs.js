@@ -12,7 +12,7 @@
    its geometry and simply behaves differently.
    ============================================================ */
 
-import { TUNE, invalidateTopSpeed } from '../physics.js';
+import { TUNE, invalidateTopSpeed } from './index.js';
 
 /**
  * A snapshot of the untouched tune. Taken once at import, before any spec has

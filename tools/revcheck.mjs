@@ -1,6 +1,6 @@
 /* Verifies the engine behaves like an engine rather than a speedometer.
    Run: node tools/revcheck.mjs */
-import { CarState, stepCar, TUNE } from '../src/physics.js';
+import { CarState, stepCar, TUNE } from '../src/physics/index.js';
 
 const dt = 1/120, ROAD = TUNE.surface.road;
 const inp = (o={}) => ({ steer:0, throttle:0, brake:0, handbrake:0, handbrakeEdge:false, boost:0, ...o });

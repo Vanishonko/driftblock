@@ -428,7 +428,7 @@ export class Effects {
 
   /**
    * @param {number} dt
-   * @param {import('./physics.js').CarState} s
+   * @param {import('./physics/index.js').CarState} s
    * @param {object} opts { onGrass, boost, painting }
    */
   update(dt, s, opts) {

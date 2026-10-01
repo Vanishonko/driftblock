@@ -3,7 +3,7 @@
 
 import { TRACK_DEFS, Track } from '../src/track.js';
 import { Game, MODES } from '../src/game.js';
-import { CarState, stepCar, TUNE } from '../src/physics.js';
+import { CarState, stepCar, TUNE } from '../src/physics/index.js';
 
 const stub = () => new Proxy({}, { get: () => () => {} });
 const hud = { pop: () => {}, tierName: () => '', bankFlash: () => {}, float: () => {}, toast: () => {}, setMode: () => {}, setLap: () => {}, setTimer: () => {}, show: () => {}, update: () => {} };
