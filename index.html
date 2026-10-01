@@ -179,6 +179,27 @@
   <div id="loading"><div class="load-bar"><i></i></div><span>BUILDING WORLD</span></div>
 </div>
 
+<!-- Boot state, recorded on the document so it can be read back without a
+     console. A module-load error (a missing method on an import, say) kills
+     main.js before it ever runs a frame, and the page still serves 200 and
+     still shows the loading screen — so "did it actually start?" has to be
+     answerable from the DOM. tools/bootcheck.mjs reads these attributes. -->
+<script>
+  document.documentElement.dataset.boot = 'pending';
+  window.addEventListener('error', function (e) {
+    var el = document.documentElement;
+    if (el.dataset.boot === 'ok') return;      // already running; not a boot failure
+    el.dataset.boot = 'error';
+    el.dataset.bootError = String((e && (e.message || e.error)) || 'unknown').slice(0, 300);
+  }, true);
+  window.addEventListener('unhandledrejection', function (e) {
+    var el = document.documentElement;
+    if (el.dataset.boot === 'ok') return;
+    el.dataset.boot = 'error';
+    el.dataset.bootError = String((e && e.reason && e.reason.message) || e.reason || 'unknown').slice(0, 300);
+  });
+</script>
+
 <script type="module" src="./src/main.js"></script>
 </body>
 </html>

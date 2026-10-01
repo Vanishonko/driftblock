@@ -562,6 +562,73 @@ function runUpdate({ keys = [], pads = [], wheel = null, bridgeInput = null }) {
     Math.abs(runUpdate({ wheel: wOnly, bridgeInput: bridgeFrame }).throttle - 0.5) < 0.01);
 }
 
+/* ============================================================
+   11. WIZARD PRESERVATION
+   ============================================================
+   Re-running a wheel calibration must not destroy settings the
+   wizard has no step for — the taught H-pattern above all, which
+   is what made recalibrating so annoying.                        */
+console.log('\nWIZARD PRESERVATION');
+{
+  const w = new WheelInput();
+  w.cal = {
+    ...defaultCalibration('g29'),
+    gearPattern: [null, [3], [4], [5], [6], [7], [8], [9]],
+    ffbStrength: 0.41,
+    ffbFriction: 0.13,
+    steerGamma: 0.77,
+    steerDeadzone: 0.031,
+    rangeDeg: 720,
+    shiftUpButton: 12,
+    shiftDownButton: 13,
+    throttleAxis: 2,
+    brakeAxis: 5,
+  };
+  w.wheel = { id: 'G29 Driving Force Racing Wheel', axes: [0, 1, 1, 0, 0, 1], buttons: [] };
+  w.rawAxes = [0, 1, 1, 0, 0, 1];
+  w.rawButtons = [];
+  w.rawName = w.wheel.id;
+
+  const L = new WheelLearner(w);
+  L.steerAxis = 0; L.steerMin = -1; L.steerMax = 1;
+  L.leftValue = -1; L.rightValue = 1;
+  L.throttleAxis = 2; L.brakeAxis = 5;
+  L._finish();
+  const r = L.result;
+
+  check('the taught H-pattern survives a wheel recalibration',
+    Array.isArray(r.gearPattern) && r.gearPattern[1] && r.gearPattern[1][0] === 3,
+    r.gearPattern ? `gate 1 = [${r.gearPattern[1]}]` : 'gearPattern is ' + r.gearPattern);
+  check('force feedback strength survives', r.ffbStrength === 0.41, `${r.ffbStrength}`);
+  check('force feedback friction survives', r.ffbFriction === 0.13, `${r.ffbFriction}`);
+  check('steering gamma survives', r.steerGamma === 0.77, `${r.steerGamma}`);
+  check('rotation range survives', r.rangeDeg === 720, `${r.rangeDeg}`);
+  check('shift buttons survive', r.shiftUpButton === 12 && r.shiftDownButton === 13,
+    `${r.shiftUpButton}/${r.shiftDownButton}`);
+  check('the clutch axis is not cleared', r.clutchAxis === 1, `${r.clutchAxis}`);
+  check('but the measured steering axis is still written', r.steerAxis === 0, `${r.steerAxis}`);
+  check('and the measured throttle/brake axes are still written',
+    r.throttleAxis === 2 && r.brakeAxis === 5, `${r.throttleAxis}/${r.brakeAxis}`);
+}
+
+/* ---- 12. one source of truth for the force defaults ---- */
+console.log('\nFORCE DEFAULTS');
+{
+  // These lived in two files and had already drifted: a fresh calibration
+  // shipped friction 0.5 while the force model wanted 0.24, so the rim felt
+  // like plain resistance. Keep them tied together.
+  for (const preset of WHEEL_PRESETS) {
+    const c = defaultCalibration(preset.id);
+    check(`${preset.id} calibration uses the force model's defaults`,
+      c.ffbStrength === FFB_DEFAULTS.strength && c.ffbFriction === FFB_DEFAULTS.friction,
+      `strength ${c.ffbStrength}, friction ${c.ffbFriction}`);
+  }
+  const d = defaultCalibration('generic');
+  check('and friction is low enough for the aligning torque to be felt',
+    d.ffbFriction <= FFB_DEFAULTS.friction + 1e-9 && d.ffbFriction < 0.35,
+    `${d.ffbFriction}`);
+}
+
 console.log(failures === 0
   ? '\nAll wheel + FFB checks passed.\n'
   : `\n${failures} check(s) FAILED.\n`);

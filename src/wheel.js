@@ -10,6 +10,8 @@
    head start on the calibration the wizard would find anyway.
    ============================================================ */
 
+import { FFB_DEFAULTS } from './ffb.js';
+
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 
 /* ============================================================
@@ -157,9 +159,15 @@ export function defaultCalibration(presetId = 'generic') {
     handbrakeAxis: -1,     // some wheels have an analogue handbrake
 
     rangeDeg: p.rangeDeg,
-    ffbStrength: 0.75,
-    ffbInvert: false,
-    ffbFriction: 0.5,
+    // Taken from the force model rather than duplicated here. These two had
+    // already drifted apart: this file still said friction 0.5 while
+    // FFB_DEFAULTS said 0.24, so a fresh calibration — or one produced by the
+    // setup wizard — got exactly the heavy constant friction that masks the
+    // directional aligning torque and makes the rim feel like plain
+    // resistance. The migration only ever fixed *saved* calibrations.
+    ffbStrength: FFB_DEFAULTS.strength,
+    ffbInvert: FFB_DEFAULTS.invert,
+    ffbFriction: FFB_DEFAULTS.friction,
     ffbEnabled: true,
 
     // A wheel needs finer steering than a pad, so it gets its own
@@ -212,6 +220,37 @@ export class WheelInput {
   }
 
   /* ---------------- device discovery ---------------- */
+
+  /**
+   * Wake up when the browser starts or stops showing us a gamepad.
+   *
+   * Chrome and Safari keep a gamepad hidden from a page until the driver has
+   * physically touched it — pressed a button, turned the wheel, moved a pedal.
+   * A wheel that is plugged in and working perfectly is invisible until then,
+   * which reads as "it is not detecting my wheel". These events are the
+   * reliable signal that it has appeared; polling alone picks it up a frame
+   * later but gives no way to explain the wait.
+   *
+   * @param {(connected: boolean) => void} [onChange]
+   * @returns {() => void} unsubscribe
+   */
+  watch(onChange) {
+    if (typeof window === 'undefined' || !window.addEventListener) return () => {};
+    const fire = () => {
+      this.poll();
+      if (onChange) onChange(this.connected);
+    };
+    window.addEventListener('gamepadconnected', fire);
+    window.addEventListener('gamepaddisconnected', fire);
+    return () => {
+      window.removeEventListener('gamepadconnected', fire);
+      window.removeEventListener('gamepaddisconnected', fire);
+    };
+  }
+
+  /** True once the browser has ever handed us a pad this session. */
+  get everSeen() { return this._everSeen === true; }
+
   poll() {
     if (!navigator.getGamepads) return;
     const pads = Array.from(navigator.getGamepads()).filter((p) => p && p.connected);
@@ -258,6 +297,7 @@ export class WheelInput {
       this.prevButtons = this.rawButtons.slice();
     }
     this._connected = !!pick;
+    if (pick) this._everSeen = true;
   }
 
   get connected() { return this._connected; }
@@ -677,7 +717,17 @@ export class WheelLearner {
       this.done = true;
       return;
     }
-    const c = defaultCalibration(this.wheel.cal.preset);
+    // Start from what the driver already had, not from a blank preset.
+    //
+    // This used to be `defaultCalibration(preset)` alone, so a wizard run
+    // silently discarded everything it does not itself re-learn: the taught
+    // H-pattern gates, force-feedback strength and friction, steering gamma
+    // and deadzone, rotation range and the shift-up/down buttons. Redoing a
+    // wheel calibration therefore destroyed the shifter setup.
+    //
+    // The assignments below overwrite exactly the fields the wizard actually
+    // measures, so anything it did not measure survives.
+    const c = { ...defaultCalibration(this.wheel.cal.preset), ...this.wheel.cal };
     const axes = this.wheel.rawAxes;
 
     if (this.steerAxis >= 0 && this.steerMin !== undefined) {
@@ -702,7 +752,8 @@ export class WheelLearner {
     if (this.boostButton >= 0) c.boostButton = this.boostButton;
     c.deviceId = this.wheel.wheel ? this.wheel.wheel.id : null;
     c.deviceName = this.wheel.rawName;
-    c.clutchAxis = -1;   // only the preset knows about a clutch
+    // clutchAxis is deliberately left alone: the wizard has no step for it,
+    // so it keeps whatever the preset or a previous setup decided.
 
     // If the two holds were nearly the same value the driver probably let go
     // early, or the wheel barely moved. Say so rather than saving a

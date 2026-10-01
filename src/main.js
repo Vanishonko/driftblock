@@ -12,6 +12,7 @@ import { Effects } from './effects.js';
 import { HUD } from './hud.js';
 import { Game, MODES, fmtTime, SCORE } from './game.js';
 import { TUNE, clamp, invalidateTopSpeed } from './physics.js';
+import { load as loadSettings, patch as patchSettings, flush as flushSettings } from './core/settings.js';
 import { WheelInput, defaultCalibration } from './wheel.js';
 import { ForceFeedback } from './ffb.js';
 import { WheelUI } from './wheelui.js';
@@ -55,20 +56,11 @@ function applyTune(id) {
 
 /* ============================================================
    SAVE
+   ============================================================
+   All persisted state lives in core/settings.js. Nothing here
+   touches localStorage directly: reads go through `save`, writes
+   through `patch()`, which debounces and validates.
    ============================================================ */
-const SAVE_KEY = 'driftblock.v1';
-const DEFAULT_SAVE = { paint: 'magenta', tune: 'balanced', bests: {}, wheel: null, volume: 0.9, engineVol: 1.15, boostMode: 'auto', uiScale: null, gearbox: false };
-
-function loadSave() {
-  try {
-    const raw = localStorage.getItem(SAVE_KEY);
-    if (!raw) return { ...DEFAULT_SAVE };
-    return { ...DEFAULT_SAVE, ...JSON.parse(raw) };
-  } catch { return { ...DEFAULT_SAVE }; }
-}
-function writeSave(s) {
-  try { localStorage.setItem(SAVE_KEY, JSON.stringify(s)); } catch { /* ignore */ }
-}
 
 /* ============================================================
    BOOT
@@ -94,8 +86,8 @@ const hud = new HUD();
 const wheel = new WheelInput();
 const ffb = new ForceFeedback();
 
-const save = loadSave();
-applyTune(save.tune);
+const save = loadSettings();
+applyTune(save.spec);
 
 if (save.wheel) wheel.setCalibration(save.wheel);
 wheel.enabled = true;
@@ -109,7 +101,6 @@ wheel.watch(() => {
 });
 
 const wheelUI = new WheelUI(wheel, ffb, save, () => {
-  writeSave(save);
   ffb.setConfig(wheel.cal);
   if (game) game.manualGearbox = !!save.gearbox;
 });
@@ -305,8 +296,8 @@ function buildGarage() {
     el.innerHTML = `<div class="swatch" style="background:linear-gradient(90deg, ${col} 65%, ${acc} 65%)"></div>
       <h3>${p.name}</h3>`;
     el.onclick = () => {
-      save.paint = p.id;
-      writeSave(save);
+      patchSettings({ paint: p.id });
+      flushSettings();          // about to reload; do not lose the debounce
       location.reload();
     };
     el.onmouseenter = () => audio.ui('move');
@@ -330,7 +321,6 @@ function buildGarage() {
       input.oninput = () => {
         const v = parseFloat(input.value);
         set(v); out.textContent = Math.round(v * 100) + '%';
-        save.volume = save.volume; writeSave(save);
       };
       row.appendChild(input); row.appendChild(out);
       ah.appendChild(row);
@@ -355,8 +345,7 @@ function buildGarage() {
       b.textContent = label;
       b.title = hint;
       b.onclick = () => {
-        save.boostMode = val;
-        writeSave(save);
+        patchSettings({ boostMode: val });
         if (game) game.boostMode = val;
         audio.ui('select');
         buildGarage();
@@ -383,8 +372,7 @@ function buildGarage() {
     out.className = 'settings-value';
     out.textContent = 'AUTO ×' + info.autoScale.toFixed(2);
     const apply = (v, manual) => {
-      save.uiScale = manual ? v : null;
-      writeSave(save);
+      patchSettings({ uiScale: manual ? v : null });
       resize();
       const i2 = displayInfo();
       out.textContent = (manual ? '×' : 'AUTO ×') + (manual ? v.toFixed(2) : i2.autoScale.toFixed(2));
@@ -436,11 +424,10 @@ function buildGarage() {
   th.innerHTML = '';
   for (const t of TUNES) {
     const el = document.createElement('button');
-    el.className = 'card' + (t.id === save.tune ? ' sel' : '');
+    el.className = 'card' + (t.id === save.spec ? ' sel' : '');
     el.innerHTML = `<h3>${t.name}</h3><div class="desc">${t.desc}</div>`;
     el.onclick = () => {
-      save.tune = t.id;
-      writeSave(save);
+      patchSettings({ spec: t.id });
       applyTune(t.id);
       buildGarage();
       audio.ui('ok');
@@ -509,7 +496,7 @@ function showResults(res) {
       topSpeed: Math.max(res.topSpeed, prev ? prev.topSpeed || 0 : 0),
     };
   }
-  writeSave(save);
+  flushSettings();
 
   const rows = [];
   const add = (k, v, cls = '') => rows.push(`<div class="res-row ${cls}"><span class="k">${k}</span><span class="v">${v}</span></div>`);
@@ -572,8 +559,8 @@ overlay.addEventListener('click', (e) => {
       break;
     case 'wipe':
       if (confirm('Erase all records and settings?')) {
-        save.bests = {};
-        writeSave(save);
+        patchSettings({ bests: {} });
+        flushSettings();
         buildBestStrip();
         audio.ui('back');
       }
@@ -802,7 +789,10 @@ function reportFrameError(err) {
 
 function frame(now) {
   // re-arm BEFORE the body, so a throw cannot kill the loop
-  requestAnimationFrame(frame);
+  addEventListener('pagehide', flushSettings);
+addEventListener('visibilitychange', () => { if (document.hidden) flushSettings(); });
+
+requestAnimationFrame(frame);
   try {
     frameBody(now);
   } catch (err) {
@@ -963,15 +953,31 @@ camRig.snap(game.car);
 game.state = 'idle';
 
 setTimeout(() => document.getElementById('loading').classList.add('done'), 350);
+// The loop is armed and every module resolved: record it so a headless
+// check can tell "running" from "the module threw on load".
+document.documentElement.dataset.boot = 'ok';
 requestAnimationFrame(frame);
 
 // expose for debugging / tuning from the console
 window.DRIFTBLOCK = {
   TUNE, camera, renderer, scene, startRun, loadWorld, TRACK_DEFS, MODES, PAINTS,
-  input, hud, audio, camRig, wheel, ffb, wheelUI,
+  input, hud, audio, camRig, wheel, ffb, wheelUI, save,
   // live handles — these are reassigned when the world is rebuilt
   get game() { return game; },
   get track() { return track; },
   get effects() { return effects; },
   get carMesh() { return carMesh; },
+  /** One-line health summary, for smoke tests and bug reports. */
+  health() {
+    return {
+      booted: true,
+      state: game ? game.state : 'none',
+      settings: Object.keys(save).sort(),
+      wheelSeen: !!(wheel && wheel.connected),
+      wheelEverSeen: !!(wheel && wheel.everSeen),
+      ffb: ffb ? ffb.bridge.status : 'none',
+      track: track ? track.def.id : 'none',
+      frameErrors: typeof frameErrors === 'number' ? frameErrors : -1,
+    };
+  },
 };

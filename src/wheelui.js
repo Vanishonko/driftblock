@@ -372,10 +372,13 @@ export class WheelUI {
       apply.onclick = () => {
         if (this.learningShifter) {
           this.wheel.cal.gearPattern = r.gearPattern;
-          this.commit();
         } else {
           this.wheel.setCalibration(r);
         }
+        // Both paths must persist. The wheel-calibration branch used to skip
+        // this, so a full recalibration was thrown away on the next reload
+        // and had to be redone every session.
+        this.commit();
         this.learner = null;
         this.refreshControls();
         this.build();
