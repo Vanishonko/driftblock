@@ -170,10 +170,14 @@ countersteered:
 - **Sticky slide state.** Once the rear is loose it stays loose briefly, so a
   dip in angle does not instantly re-plant the tyres. Lift off, straighten, and
   it decays back to planted in about a second.
-- **Throttle sustains the slide.** Countersteer is by definition *less* lock
-  than the slide was started with, so a blend driven by steering angle reads
-  "not drifting" exactly when you are holding the biggest angle. On the gas
-  with real slip, the rear stays lit whatever the wheel is doing.
+- **Throttle sustains the slide.** The grip blend takes the steering *angle*
+  as a proxy for how hard the driver is asking the rear to work, and that
+  proxy is unreliable sideways. Countersteer is opposite in sign to the lock
+  that started the slide, but its magnitude is whatever the slide needs — in
+  a big angle, usually most of the available lock. A blend reading only the
+  angle can therefore decide "not drifting" at the exact moment the car is
+  most sideways. The honest signal is the slip plus the throttle: if the rear
+  is away and you are still on the gas, it stays away.
 - **Power keeps the car rotating.** In this model steering commands yaw
   directly, so countersteer commands the *opposite* yaw, flips the rotation and
   straightens the car. A real drift keeps yawing into the corner — the rotation

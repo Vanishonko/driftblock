@@ -45,20 +45,31 @@ export function stepCar(s, input, dt, surf) {
   const demand = Math.abs(s.steer)
     * clamp(Math.abs(vf) / 18, 0, 1)
     * clamp(input.throttle, 0, 1);
-  // blend smoothly from planted to sliding, driven by EITHER an existing
-  // slide or simply asking for too much — so a big handful of steering and
-  // throttle will break traction on its own, and the handbrake becomes a
-  // tool rather than a requirement.
-  // Sticky. The instant the rear is loose it stays loose for a moment, even
-  // if the angle dips — otherwise grip returns the moment you stop asking,
-  // which makes the car snap straight the instant you countersteer and makes
-  // a slide impossible to hold on the throttle. It still recovers: lift off,
-  // straighten, and it decays back to planted in about a second.
-  // Throttle sustains a slide on its own. Countersteer is by definition LESS
-  // lock than the slide was initiated with, so a blend driven by steering
-  // angle alone reads "not drifting" exactly when you are holding the biggest
-  // angle — and re-plants the tyres. Once there is real slip and you are on
-  // the gas, the rear stays lit whatever the wheel is doing.
+  // How far from planted to sliding the car is, from three signals:
+  //
+  //   1. the slide already happening, so a big angle sustains itself
+  //   2. asking for too much — a big handful of steering AND throttle breaks
+  //      traction on its own, which makes the handbrake a tool rather than
+  //      the only way in
+  //   3. throttle with real slip, see below
+  //
+  // It is sticky: once the rear is loose it stays loose briefly even if the
+  // angle dips, so a slide survives a moment of countersteer. It still
+  // recovers — lift off, straighten, and it decays back to planted in about
+  // a second.
+  //
+  // `demand` above uses the steering ANGLE as a proxy for how hard the driver
+  // is asking the rear to work, and that proxy is unreliable once the car is
+  // sideways. Countersteer is opposite in SIGN to the lock that started the
+  // slide, but its MAGNITUDE is whatever the slide needs — in a big angle
+  // that is routinely most of the available lock, and sometimes more than was
+  // used to initiate it. So a blend driven by steering angle alone can read
+  // "not drifting" at the exact moment the car is most sideways, and re-plant
+  // the tyres.
+  //
+  // The honest signal is the slip itself plus the throttle: if the rear is
+  // already away and the driver is still on the gas, it stays away, whatever
+  // the wheel is doing.
   const sustain = clamp((absSlip - 0.07) / 0.25, 0, 1) * clamp(input.throttle, 0, 1) * 0.95;
   const slideNow = clamp(Math.max(
     (absSlip - T.driftSlip * 0.40) / (T.driftSlip * 1.30),

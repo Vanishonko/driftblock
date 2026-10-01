@@ -17,6 +17,7 @@ import { SPECS, applySpec } from './physics/specs.js';
 import {
   init as initGarage, buildGarage, buildSpecCards, changeSpec,
 } from './ui/garage.js';
+import { init as initFfbDebug, toggle as toggleFfbDebug } from './ui/ffbdebug.js';
 import {
   attach as attachDisplay, resize, displayInfo, isFullscreen,
   requestFullscreen, toggleFullscreen, applyFullscreenPreference,
@@ -107,6 +108,10 @@ initGarage({
   save, audio, hud, flush: flushSettings,
   getGame: () => game,
 });
+
+// The whole force-feedback chain on one screen, because every value needed to
+// diagnose a dead wheel exists and is otherwise scattered across four modules.
+initFfbDebug({ wheel, ffb, input });
 camRig.track = null;
 
 function loadWorld(trackDef) {
@@ -404,6 +409,12 @@ function buildOptions() {
     };
     frow.appendChild(fbtn);
     dh.appendChild(frow);
+
+    const dbg = document.createElement('button');
+    dbg.className = 'btn';
+    dbg.textContent = 'FORCE FEEDBACK DIAGNOSTICS  (Ctrl+D)';
+    dbg.onclick = () => { toggleFfbDebug(true); hideOverlay(); };
+    dh.appendChild(dbg);
 
     const fhint = document.createElement('p');
     fhint.className = 'wheel-hint';

@@ -604,3 +604,34 @@ html, body {
 .card.compact h3 { font-size: 12px; margin: 0 0 3px; }
 .card.compact .desc { font-size: 10px; line-height: 1.4; }
 #pauseSpecCards { margin-bottom: 4px; }
+
+/* ---- force-feedback debug overlay (Ctrl+D) ---- */
+#ffbDebug {
+  position: fixed; inset: auto 16px 16px auto; z-index: 9998;
+  width: min(420px, 92vw); max-height: 78vh; overflow-y: auto;
+  padding: 12px 14px 14px;
+  background: rgba(6,8,16,.94); border: 2px solid var(--line);
+  font: 500 11px/1.5 ui-monospace, Menlo, monospace; color: #cfd6e6;
+  display: none;
+}
+#ffbDebug.show { display: block; }
+.ffbd-head {
+  display: flex; justify-content: space-between; align-items: baseline;
+  letter-spacing: .12em; color: #2fe0ff; font-weight: 800;
+  border-bottom: 1px solid var(--line); padding-bottom: 7px; margin-bottom: 9px;
+}
+.ffbd-head em { font-style: normal; font-size: 9px; color: #6d7688; letter-spacing: .06em; }
+.ffbd-sec { margin-bottom: 10px; padding-left: 8px; border-left: 3px solid #2a3244; }
+.ffbd-sec.ok { border-left-color: #46f5a0; }
+.ffbd-sec.bad { border-left-color: #ff5b5b; }
+.ffbd-sec h4 {
+  margin: 0 0 5px; font-size: 9.5px; letter-spacing: .1em;
+  color: #8b93a7; font-weight: 700;
+}
+.ffbd-row { display: flex; justify-content: space-between; gap: 10px; }
+.ffbd-row span { color: #7b8398; white-space: pre; }
+.ffbd-row b { color: #e8eefc; font-weight: 700; text-align: right; word-break: break-all; }
+.ffbd-row.ok b { color: #46f5a0; }
+.ffbd-row.bad b { color: #ff6b6b; }
+.ffbd-note { margin: 5px 0 0; color: #ffb020; font-size: 10px; line-height: 1.45; }
+.ffbd-note code { color: #2fe0ff; }
