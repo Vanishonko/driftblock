@@ -37,11 +37,13 @@
    the one that works, and you should expect to power-cycle the wheel
    afterwards.
 
-   It is not yet established whether the input interface is genuinely
-   at fault or whether the wheel was already in a bad state from an
-   earlier tool's mode-switch commands. Test it on a freshly
-   power-cycled wheel, and if it kills the inputs again, that settles
-   it.
+   This was tested on a healthy, power-cycled wheel: writing effect
+   commands to the input interface does NOT stop the browser reading
+   it. Both work at once, which is why input is the default here.
+
+   The earlier theory that the interface was at fault came from a wheel
+   that had already been left in a bad mode by another tool's
+   mode-switch commands, where nothing worked on either interface.
 
    Command bytes come from the Linux hid-lg4ff driver and from the
    logitech-g29 source.

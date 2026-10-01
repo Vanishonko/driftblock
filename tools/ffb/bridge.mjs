@@ -445,12 +445,12 @@ listenWithFallback(server, START_PORT, 20, (port) => {
   console.log('');
   console.log(`  Interface: ${IFACE}` +
     (IFACE === 'vendor'
-      ? '   (safe: leaves the browser\'s wheel reads alone)'
-      : '   !! input interface — may stop the game seeing the wheel'));
+      ? '   (vendor; a G29 does not accept force feedback here)'
+      : '   (input; the one a G29 accepts force feedback on)'));
   console.log('');
   console.log('  No force feedback?  node bridge.mjs --test');
   console.log('  Wheel stuck?        node bridge.mjs --release');
-  console.log('  Want to try the working-but-risky path:  --iface=input');
+  console.log('  Diagnostics:   Ctrl+D in the game, or /ffb-status on this address');
   console.log('  Press Ctrl+C to stop.\n');
   wsRef = ws;
   initWheel(ws);
