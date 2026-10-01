@@ -50,38 +50,44 @@ export class WheelUI {
     r.appendChild(this.statusCard);
 
     // ---------- live monitor ----------
-    const mon = el('div', 'wheel-card');
+    // This one spans the full width: with a wheel connected it holds every
+    // axis and every button, so in a column it would be several times the
+    // height of anything beside it and drag the whole screen past the fold.
+    // Full width, the axes and the buttons sit side by side instead.
+    const mon = el('div', 'wheel-card wheel-monitor');
     mon.appendChild(el('h3', null, 'LIVE MONITOR'));
     mon.appendChild(el('p', 'wheel-hint',
-      'Move the wheel and press the pedals — the bars below show exactly what the browser receives.'));
+      'Move the wheel and press the pedals — this is exactly what the browser receives.'));
+
+    const monBody = el('div', 'monitor-body');
+    const axesCol = el('div');
+    axesCol.appendChild(el('div', 'wheel-sub', 'AXES'));
     this.axisHost = el('div', 'axis-list');
-    mon.appendChild(this.axisHost);
     this.axisEmpty = el('div', 'wheel-hint', 'No wheel detected yet. Plug it in, then press a button on it — browsers only reveal a device after it has been used.');
     this.axisHost.appendChild(this.axisEmpty);
+    axesCol.appendChild(this.axisHost);
+    monBody.appendChild(axesCol);
 
+    const btnCol = el('div');
+    btnCol.appendChild(el('div', 'wheel-sub', 'BUTTONS'));
     this.btnHost = el('div', 'button-grid');
-    mon.appendChild(el('div', 'wheel-sub', 'BUTTONS'));
-    mon.appendChild(this.btnHost);
+    btnCol.appendChild(this.btnHost);
+    monBody.appendChild(btnCol);
+
+    mon.appendChild(monBody);
     r.appendChild(mon);
 
     // ---------- wizard ----------
     const wiz = el('div', 'wheel-card');
     wiz.appendChild(el('h3', null, 'AUTO-DETECT'));
     wiz.appendChild(el('p', 'wheel-hint',
-      'Don\'t know which axis is which? This walks you through it and works out the layout from your inputs.'));
+      'Works out which axis is which from your inputs, and teaches the H-pattern.'));
     this.wizardBox = el('div', 'wizard-box');
     this.wizardBtn = el('button', 'btn btn-primary', 'START AUTO-DETECT');
     this.wizardBtn.onclick = () => this.startLearn();
     this.wizardBox.appendChild(this.wizardBtn);
     wiz.appendChild(this.wizardBox);
     r.appendChild(wiz);
-
-    // ---------- manual mapping ----------
-    const map = el('div', 'wheel-card');
-    map.appendChild(el('h3', null, 'MAPPING'));
-    this.mapHost = el('div', 'map-grid');
-    map.appendChild(this.mapHost);
-    r.appendChild(map);
 
     // ---------- steering feel ----------
     const feel = el('div', 'wheel-card');
@@ -94,19 +100,35 @@ export class WheelUI {
     const gear = el('div', 'wheel-card');
     gear.appendChild(el('h3', null, 'GEARBOX'));
     gear.appendChild(el('p', 'wheel-hint',
-      'The game shifts automatically by default. Turn on the manual gearbox to use paddles or an H-pattern shifter — and remember to use the clutch, or the shift bites.'));
+      'Automatic by default. Manual lets you pick gears, reach neutral, and use an H-pattern — with the clutch, or the shift bites.'));
     this.gearboxHost = el('div', 'map-grid');
     gear.appendChild(this.gearboxHost);
     r.appendChild(gear);
 
     // ---------- force feedback ----------
-    const ffbCard = el('div', 'wheel-card');
+    // Spans two columns so it can put the sliders and the bridge status side
+    // by side. In one column it was 336px against GEARBOX's 223, which left a
+    // whole empty column beside it and pushed the screen past the fold.
+    const ffbCard = el('div', 'wheel-card wheel-ffb');
     ffbCard.appendChild(el('h3', null, 'FORCE FEEDBACK'));
+    const ffbBody = el('div', 'ffb-body');
     this.ffbHost = el('div', 'map-grid');
-    ffbCard.appendChild(this.ffbHost);
+    ffbBody.appendChild(this.ffbHost);
     this.bridgeBox = el('div', 'bridge-box');
-    ffbCard.appendChild(this.bridgeBox);
+    ffbBody.appendChild(this.bridgeBox);
+    ffbCard.appendChild(ffbBody);
     r.appendChild(ffbCard);
+
+    // ---------- manual mapping ----------
+    // Ten rows of dropdowns, and the tallest card on the screen. It is built
+    // LAST and spans the full width so it can go two-up: a column-span element
+    // stops following content flowing back alongside it, so spanning anything
+    // in the middle leaves a hole. At the end there is nothing after it to gap.
+    const map = el('div', 'wheel-card wheel-map');
+    map.appendChild(el('h3', null, 'MAPPING'));
+    this.mapHost = el('div', 'map-grid');
+    map.appendChild(this.mapHost);
+    r.appendChild(map);
 
     // ---------- actions ----------
     const actions = el('div', 'wheel-actions');
@@ -292,27 +314,13 @@ export class WheelUI {
     // just has not been told about it yet.
     if (!br.wheelSeen) {
       b.appendChild(el('p', 'wheel-hint bad',
-        'NO WHEEL VISIBLE YET. Chrome keeps a wheel hidden from the page until '
-        + 'you physically touch it \u2014 turn the wheel a little, or press a pedal or '
-        + 'any button on it. It will appear on its own the moment you do. '
-        + 'Nothing needs replugging.'));
+        'NO WHEEL VISIBLE YET \u2014 turn the wheel or press a pedal. Browsers hide '
+        + 'a gamepad until you touch it, so nothing needs replugging.'));
     }
 
     b.appendChild(el('p', 'wheel-hint',
-      'A browser cannot turn a wheel. Real force feedback needs the optional native bridge: ' +
-      'quit this, run <code>node tools/ffb/bridge.mjs --iface=input</code>, then open the ' +
-      'address it prints — <b>not</b> the plain dev server, which has no bridge in it.'));
-
-    // Say WHY it failed. "Could not reach the bridge" is useless when the
-    // usual cause is that you are on the plain dev server, which serves the
-    // game but has no force-feedback endpoint at all.
-    if (state === 'failed' || (state === 'off' && br.lastError)) {
-      b.appendChild(el('p', 'wheel-hint bad',
-        'No force feedback available on this address. Either the bridge is not running, ' +
-        'or you are on the plain dev server (<code>tools/serve.mjs</code>) — that one has ' +
-        'no bridge in it. Check the terminal: the bridge prints the address to use, and ' +
-        'it may not be 8177 if that port was already taken.'));
-    }
+      'Needs the bridge: <code>node tools/ffb/bridge.mjs --iface=input</code>, then open '
+      + 'the address it prints. <b>Ctrl+D</b> shows the whole chain.'));
 
     const btn = el('button', 'btn', state === 'on' ? 'DISCONNECT' : 'TRY TO CONNECT');
     btn.onclick = () => {
