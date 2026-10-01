@@ -589,6 +589,11 @@ export class Game {
   }
 }
 
+/**
+ * Seconds as m:ss.mmm, for lap times and the results table.
+ * @param {number} seconds
+ * @returns {string}
+ */
 export function fmtTime(seconds) {
   if (seconds === null || seconds === undefined) return '--:--.--';
   const m = Math.floor(seconds / 60);

@@ -110,6 +110,9 @@ function render() {
   `;
 }
 
+/**
+ * @param {{wheel:object, ffb:object, input:object}} d
+ */
 export function init(d) {
   deps = d;
   // On window, not document: an event dispatched on window does not bubble
@@ -124,6 +127,11 @@ export function init(d) {
   }, true);
 }
 
+/**
+ * Show, hide, or flip the overlay.
+ * @param {boolean} [on] omit to toggle
+ * @returns {boolean} whether it is now visible
+ */
 export function toggle(on) {
   visible = on === undefined ? !visible : !!on;
   if (visible && !root) {

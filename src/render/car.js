@@ -27,6 +27,12 @@ function box(w, h, d, mat) {
   return m;
 }
 
+/**
+ * Build the blocky car. Geometry depends only on the physical dimensions in
+ * TUNE, which no car spec touches, so a spec change never needs a rebuild.
+ * @param {object} paint one of PAINTS
+ * @returns {object} the mesh plus its named parts
+ */
 export function createCarMesh(paint) {
   const root = new THREE.Group();
 

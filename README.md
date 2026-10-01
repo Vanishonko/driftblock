@@ -45,6 +45,17 @@ then open <http://127.0.0.1:8177> yourself.
 
 ---
 
+## Settings
+
+`GARAGE` is the car: paint and spec. Everything that is not the car lives in
+`OPTIONS` — audio, display, gameplay — reachable from the title screen and from
+the pause menu. The wheel setup screen is linked from both.
+
+Settings persist in `localStorage` under `driftblock.v2`, written through
+`core/settings.js`. v1 saves are migrated on first load and the original is kept
+under `driftblock.v1.bak`, because losing a wheel calibration to a bad parse is
+worse than the parse failing.
+
 ## Controls
 
 | Action | Keyboard | Gamepad | Wheel | Touch |
@@ -337,16 +348,31 @@ harmonic set.
 ## Project layout
 
 ```
-index.html            markup + HUD
+index.html            markup, HUD, and the boot-state marker tools/bootcheck reads
+package.json          no runtime dependencies, on purpose
 src/
-  main.js             renderer, menus, save data, fixed-step loop
-  physics.js          the drift model (pure maths, no renderer)
-  car.js              blocky chassis mesh + visual state
-  track.js            procedural circuits, scenery, palettes, lighting
-  camera.js           chase rig (follows velocity, wall-aware)
-  effects.js          smoke, skid marks, sparks, speed lines
+  main.js             bootstrap, wiring and the per-frame orchestration
+  core/
+    settings.js       everything persisted: schema, migration, debounced writes
+    display.js        sizing, device pixel ratio, UI scale, fullscreen
+  physics/
+    tune.js           the tuning constants and surfaces
+    math.js           clamp / sign
+    state.js          CarState — one car at one instant
+    drivetrain.js     gearbox, revs, clutch, traction
+    step.js           one tick: longitudinal, lateral, yaw
+    specs.js          the car specs (balanced / drift / grip / monster)
+    index.js          the public surface
+  render/
+    car.js            blocky chassis mesh + visual state
+    track.js          procedural circuits, scenery, palettes, lighting
+    camera.js         chase rig (follows velocity, wall-aware)
+    effects.js        smoke, skid marks, sparks, speed lines
+    hud.js            tachometer canvas + drift readouts
+  ui/
+    garage.js         paint and spec, shared with the in-run pause picker
+    ffbdebug.js       the force-feedback chain overlay (Ctrl+D)
   audio.js            fully synthesised engine/tyres/impacts/UI
-  hud.js              tachometer canvas + drift readouts
   game.js             scoring, combo chains, collisions, run modes
   input.js            keyboard / gamepad / wheel / touch
   wheel.js            wheel detection, calibration, learning wizard
@@ -355,6 +381,12 @@ src/
 tools/
   serve.mjs           no-cache dev server
   static-server.mjs   shared static handler
+  checkall.mjs        runs every suite, one summary
+  lint.mjs            the structural rules this project commits to
+  bootcheck.mjs       does the app actually start? (see below)
+  settingscheck.mjs   schema, migration, corrupt data, hostile storage
+  speccheck.mjs       spec apply is idempotent, reversible, safe mid-run
+  tyrecheck.mjs       the tyre behaviours worth keeping, as bands
   tune.mjs            headless physics tuning harness
   trackcheck.mjs      track geometry validation + AI lap test
   fuzz.mjs            randomised soak test for NaNs and blow-ups
@@ -362,13 +394,21 @@ tools/
   revcheck.mjs        engine / gearbox behaviour tests
   ffb/
     bridge.mjs        native wheel + force feedback bridge
+    g29.mjs           minimal, safe force-feedback driver
     ws-server.mjs     dependency-free WebSocket server
 ```
 
 ### Development tools
 
-The three tools under `tools/` run headlessly in Node and were used to build the
-game. They are the fastest way to change the handling:
+```bash
+npm test                       # every suite, one summary
+npm run lint                   # structural rules
+npm run check                  # both
+npm start                      # the game, on 127.0.0.1:8177
+npm run wheel                  # the game plus force feedback
+```
+
+Individual suites:
 
 ```bash
 node tools/tune.mjs            # 0-100, drift envelope, donuts, recovery, boost
@@ -380,12 +420,23 @@ node tools/revcheck.mjs        # engine response, gearbox, wheelspin, shifts
 
 `tune.mjs` prints a drift envelope — the steady-state slip angle for every
 combination of handbrake, throttle and steering. If you change a handling
-constant, run it and read the table rather than guessing in the browser.
+constant, run it and read the table rather than guessing in the browser. It is
+also the thing that caught the friction-circle rewrite driving worse than what
+it replaced, when every behavioural test passed.
 
 `ffbcheck.mjs` is worth knowing about if you touch the wheel code: it drives the
 real `Input.update()` merge with stubbed devices, because the wheel's steering
 sign and the keyboard's are flipped in different places and it is very easy to
 flip one twice.
+
+`bootcheck.mjs` exists because a missing method on an imported object shipped
+once — `main.js` called `wheel.watch()` when `WheelInput` had no such method.
+That is a TypeError at module load, so the game never started, while the page
+still served 200 and still drew the loading screen. Every visible symptom ("no
+inputs", "the keyboard does nothing", "my wheel isn't detected") had that one
+cause. The check walks the import graph and verifies that every method `main.js`
+calls on an instance actually exists on that class, and it refuses to pass
+vacuously — the first version inspected zero calls and reported OK.
 
 ---
 

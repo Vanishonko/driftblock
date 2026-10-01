@@ -1,0 +1,19 @@
+{
+  "name": "driftblock",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A blocky 3D drift racing game. Browser, no build step, no assets — every circuit, sound and particle generated at runtime.",
+  "type": "module",
+  "scripts": {
+    "start": "node tools/serve.mjs",
+    "wheel": "node tools/ffb/bridge.mjs --iface=input",
+    "test": "node tools/checkall.mjs",
+    "lint": "node tools/lint.mjs",
+    "check": "node tools/lint.mjs && node tools/checkall.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "comment": "No runtime dependencies on purpose: the game runs from a static server with no build step. tools/ffb has its own package.json for node-hid, which only the optional force-feedback bridge needs.",
+  "license": "UNLICENSED"
+}

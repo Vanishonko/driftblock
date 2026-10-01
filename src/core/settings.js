@@ -184,6 +184,11 @@ export function patch(partial) {
   return s;
 }
 
+/**
+ * Be told after each committed change.
+ * @param {(all:object, partial:object|null) => void} fn
+ * @returns {() => void} unsubscribe
+ */
 export function subscribe(fn) {
   listeners.add(fn);
   return () => listeners.delete(fn);
