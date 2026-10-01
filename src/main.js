@@ -119,6 +119,7 @@ const wheelUI = new WheelUI(wheel, ffb, save, () => {
 const paint = PAINTS.find((p) => p.id === save.paint) || PAINTS[0];
 audio.setMasterVolume(save.volume ?? 0.9);
 audio.setEngineVolume(save.engineVol ?? 1.15);
+audio.setWindVolume(save.windVol ?? 1.0);
 
 /* ---------------- world ---------------- */
 let track = null;
@@ -172,6 +173,7 @@ const screens = {
   mode: document.getElementById('screenMode'),
   track: document.getElementById('screenTrack'),
   garage: document.getElementById('screenGarage'),
+  options: document.getElementById('screenOptions'),
   wheel: document.getElementById('screenWheel'),
   how: document.getElementById('screenHow'),
   pause: document.getElementById('screenPause'),
@@ -181,12 +183,37 @@ const screens = {
 let currentScreen = 'title';
 let pendingMode = MODES[0];
 
+/**
+ * Where BACK should return to. Screens can be reached from more than one
+ * place — OPTIONS is on both the title and the pause menu — so "back" has to
+ * remember the route rather than assuming the title. Without this, opening
+ * options from a paused run and pressing BACK dropped you out of the run.
+ */
+const navStack = [];
+
 function showScreen(name) {
   overlay.classList.remove('hidden');
   for (const [k, el] of Object.entries(screens)) el.classList.toggle('hidden', k !== name);
   currentScreen = name;
   hud.show(false);
   if (name === 'wheel') wheelUI.open(); else wheelUI.close();
+}
+
+/** Navigate, remembering where we came from. */
+function navTo(name, build) {
+  if (build) build();
+  navStack.push(currentScreen);
+  showScreen(name);
+}
+
+/** Step back one screen. Shared by the BACK button and Escape. */
+function goBack() {
+  const prev = navStack.pop() || 'title';
+  if (prev === 'pause' && game && game.state === 'paused') showScreen('pause');
+  else if (prev === 'options') navTo('options', buildOptions);
+  else if (prev === 'mode') navTo('mode', buildModeCards);
+  else if (prev === 'garage') navTo('garage', buildGarage);
+  else { buildBestStrip(); showScreen('title'); }
 }
 
 function hideOverlay() {
@@ -244,7 +271,7 @@ function buildModeCards() {
       pendingMode = m;
       audio.ui('ok');
       buildTrackCards();
-      showScreen('track');
+      navTo('track');
     };
     el.onmouseenter = () => audio.ui('move');
     host.appendChild(el);
@@ -304,6 +331,39 @@ function buildGarage() {
     ph.appendChild(el);
   }
 
+  buildSpecCards(document.getElementById('tuneCards'));
+}
+
+/**
+ * The spec cards. Shared by the garage and — from the pause menu — by the
+ * in-run picker, so a spec change mid-session uses exactly the same UI.
+ * @param {HTMLElement} host
+ * @param {{onPick?: () => void}} [opts]
+ */
+function buildSpecCards(host, opts = {}) {
+  if (!host) return;
+  host.innerHTML = '';
+  for (const t of TUNES) {
+    const el = document.createElement('button');
+    el.className = 'card' + (t.id === save.spec ? ' sel' : '');
+    el.innerHTML = `<h3>${t.name}</h3><div class="desc">${t.desc}</div>`;
+    el.onclick = () => {
+      patchSettings({ spec: t.id });
+      applyTune(t.id);
+      audio.ui('ok');
+      hud.toast('SPEC: ' + t.name);
+      if (opts.onPick) opts.onPick();
+      else buildGarage();
+    };
+    el.onmouseenter = () => audio.ui('move');
+    host.appendChild(el);
+  }
+}
+
+/* ============================================================
+   OPTIONS — everything that is not the car
+   ============================================================ */
+function buildOptions() {
   // ---- audio
   const ah = document.getElementById('audioCards');
   if (ah) {
@@ -325,35 +385,53 @@ function buildGarage() {
       row.appendChild(input); row.appendChild(out);
       ah.appendChild(row);
     };
-    mk('MASTER VOLUME', () => save.volume, (v) => { save.volume = v; audio.setMasterVolume(v); });
-    mk('ENGINE VOLUME', () => save.engineVol, (v) => { save.engineVol = v; audio.setEngineVolume(v); });
+    mk('MASTER VOLUME', () => save.volume, (v) => { patchSettings({ volume: v }); audio.setMasterVolume(v); });
+    mk('ENGINE VOLUME', () => save.engineVol, (v) => { patchSettings({ engineVol: v }); audio.setEngineVolume(v); });
+    mk('WIND', () => save.windVol, (v) => { patchSettings({ windVol: v }); audio.setWindVolume(v); });
 
-    // ---- mini-turbo. It fires on its own when you leave a charged drift,
-    // which is not always what you want mid-corner.
-    const brow = document.createElement('div');
-    brow.className = 'settings-row';
-    brow.innerHTML = '<span class="settings-label">MINI-TURBO</span>';
-    const seg = document.createElement('div');
-    seg.className = 'seg';
-    for (const [val, label, hint] of [
-      ['auto', 'AUTO', 'Fires when you leave a charged drift, or on your button'],
-      ['manual', 'BUTTON', 'Only fires when you press the button'],
-      ['off', 'OFF', 'No mini-turbo at all'],
-    ]) {
-      const b = document.createElement('button');
-      b.className = 'seg-btn' + ((save.boostMode || 'auto') === val ? ' on' : '');
-      b.textContent = label;
-      b.title = hint;
-      b.onclick = () => {
-        patchSettings({ boostMode: val });
-        if (game) game.boostMode = val;
-        audio.ui('select');
-        buildGarage();
-      };
-      seg.appendChild(b);
-    }
-    brow.appendChild(seg);
-    ah.appendChild(brow);
+  }
+
+  // ---- gameplay
+  const gh = document.getElementById('gameplayCards');
+  if (gh) {
+    gh.innerHTML = '';
+
+    const seg = (label, hint, current, options, onPick) => {
+      const row = document.createElement('div');
+      row.className = 'settings-row';
+      row.innerHTML = `<span class="settings-label">${label}</span>`;
+      const box = document.createElement('div');
+      box.className = 'seg';
+      for (const [val, text] of options) {
+        const b = document.createElement('button');
+        b.className = 'seg-btn' + (current === val ? ' on' : '');
+        b.textContent = text;
+        b.onclick = () => { onPick(val); audio.ui('select'); buildOptions(); };
+        box.appendChild(b);
+      }
+      row.appendChild(box);
+      gh.appendChild(row);
+      if (hint) {
+        const p = document.createElement('p');
+        p.className = 'settings-note';
+        p.textContent = hint;
+        gh.appendChild(p);
+      }
+    };
+
+    seg('MINI-TURBO', 'AUTO releases on leaving a charged drift and on your button. BUTTON is button only.',
+      save.boostMode || 'auto',
+      [['auto', 'AUTO'], ['manual', 'BUTTON'], ['off', 'OFF']],
+      (v) => { patchSettings({ boostMode: v }); if (game) game.boostMode = v; });
+
+    seg('GEARBOX', 'Manual lets you pick the gear, reach neutral, and use an H-pattern shifter.',
+      save.gearbox ? 'manual' : 'auto',
+      [['auto', 'AUTO'], ['manual', 'MANUAL']],
+      (v) => {
+        const manual = v === 'manual';
+        patchSettings({ gearbox: manual });
+        if (game) game.manualGearbox = manual;
+      });
   }
 
   // ---- display / UI scale
@@ -541,21 +619,24 @@ overlay.addEventListener('click', (e) => {
     case 'start':
       audio.ui('ok');
       pendingMode = MODES[0];
-      buildModeCards();
-      showScreen('mode');
+      navStack.length = 0;
+      navTo('mode', buildModeCards);
       break;
     case 'garage':
       audio.ui('ok');
-      buildGarage();
-      showScreen('garage');
+      navTo('garage', buildGarage);
+      break;
+    case 'options':
+      audio.ui('ok');
+      navTo('options', buildOptions);
       break;
     case 'howto':
       audio.ui('ok');
-      showScreen('how');
+      navTo('how');
       break;
     case 'wheel':
       audio.ui('ok');
-      showScreen('wheel');
+      navTo('wheel');
       break;
     case 'wipe':
       if (confirm('Erase all records and settings?')) {
@@ -567,8 +648,7 @@ overlay.addEventListener('click', (e) => {
       break;
     case 'back':
       audio.ui('back');
-      if (currentScreen === 'track') { buildModeCards(); showScreen('mode'); }
-      else { buildBestStrip(); showScreen('title'); }
+      goBack();
       break;
     case 'resume':
       audio.ui('ok');
@@ -581,6 +661,7 @@ overlay.addEventListener('click', (e) => {
       break;
     case 'quit':
       audio.ui('back');
+      navStack.length = 0;
       game.state = 'idle';
       hud.show(false);
       buildBestStrip();
@@ -809,8 +890,15 @@ function frameBody(now) {
   if (input.state.fullscreenToggle) toggleFullscreen();
 
   if (input.state.pause) {
-    if (game && game.state === 'running') {
+    const inSubScreen = overlay && !overlay.classList.contains('hidden') && currentScreen !== 'pause';
+    if (game && game.state === 'paused' && inSubScreen) {
+      // Escape while reading a sub-screen steps back to the pause menu rather
+      // than dropping you straight back into the run.
+      audio.ui('back');
+      goBack();
+    } else if (game && game.state === 'running') {
       game.state = 'paused';
+      navStack.length = 0;
       showScreen('pause');
       audio.suspend();
     } else if (game && game.state === 'paused') {

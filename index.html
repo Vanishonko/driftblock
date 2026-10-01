@@ -85,6 +85,7 @@
       <div class="menu">
         <button class="btn btn-primary" data-action="start">START ENGINE</button>
         <button class="btn" data-action="garage">GARAGE</button>
+        <button class="btn" data-action="options">OPTIONS</button>
         <button class="btn" data-action="wheel">WHEEL &amp; FORCE FEEDBACK</button>
         <button class="btn" data-action="howto">HOW TO DRIFT</button>
         <button class="btn btn-ghost" data-action="wipe">RESET PROGRESS</button>
@@ -113,8 +114,23 @@
     <!-- Garage -->
     <section class="screen hidden" id="screenGarage">
       <h2 class="screen-title">GARAGE</h2>
-      <div class="cards" id="paintCards"></div>
-      <div class="cards" id="tuneCards"></div>
+      <div class="settings-block">
+        <h3 class="settings-title">PAINT</h3>
+        <div class="cards" id="paintCards"></div>
+      </div>
+      <div class="settings-block">
+        <h3 class="settings-title">SPEC</h3>
+        <p class="settings-note">How the car behaves. Change it any time from the pause menu.</p>
+        <div class="cards" id="tuneCards"></div>
+      </div>
+      <div class="menu">
+        <button class="btn" data-action="back">BACK</button>
+      </div>
+    </section>
+
+    <!-- Options: everything that is not the car -->
+    <section class="screen hidden" id="screenOptions">
+      <h2 class="screen-title">OPTIONS</h2>
       <div class="settings-block">
         <h3 class="settings-title">AUDIO</h3>
         <div id="audioCards"></div>
@@ -122,6 +138,19 @@
       <div class="settings-block">
         <h3 class="settings-title">DISPLAY</h3>
         <div id="displayCards"></div>
+      </div>
+      <div class="settings-block">
+        <h3 class="settings-title">GAMEPLAY</h3>
+        <div id="gameplayCards"></div>
+      </div>
+      <div class="settings-block">
+        <h3 class="settings-title">CONTROLS</h3>
+        <p class="settings-note">
+          Steering wheels, pedals and H-pattern shifters are set up on their own screen.
+        </p>
+        <div class="menu">
+          <button class="btn" data-action="wheel">WHEEL &amp; FORCE FEEDBACK</button>
+        </div>
       </div>
       <div class="menu">
         <button class="btn" data-action="back">BACK</button>
@@ -160,6 +189,7 @@
       <div class="menu">
         <button class="btn btn-primary" data-action="resume">RESUME</button>
         <button class="btn" data-action="restart">RESTART</button>
+        <button class="btn" data-action="options">OPTIONS</button>
         <button class="btn" data-action="quit">QUIT TO MENU</button>
       </div>
     </section>

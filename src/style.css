@@ -591,3 +591,10 @@ html, body {
 .seg-btn:last-child { border-right: 1px solid var(--line); border-radius: 0 3px 3px 0; }
 .seg-btn:hover { color: #dfe6f5; background: rgba(255,255,255,.10); }
 .seg-btn.on { color: #06121a; background: #2fe0ff; border-color: #2fe0ff; }
+
+/* ---- explanatory line under a settings heading ---- */
+.settings-note {
+  margin: 2px 0 10px; max-width: 62ch;
+  font: 500 11px/1.5 ui-monospace, Menlo, monospace;
+  color: var(--dim, #8b93a7); opacity: .85;
+}

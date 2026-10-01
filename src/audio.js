@@ -12,12 +12,18 @@ export class GameAudio {
     this.ctx = null;
     this.muted = false;
     this.masterVol = 0.9;
+    this.windVol = 1.0;
     this.engineVol = 1.15;    // separate trim: the engine dominates the mix
   }
 
   setMasterVolume(v) {
     this.masterVol = clamp(v, 0, 1);
     if (this.master) this.master.gain.value = this.muted ? 0 : this.masterVol;
+  }
+
+  /** @param {number} v 0..2 trim; 1 is the tuned default */
+  setWindVolume(v) {
+    this.windVol = Math.max(0, Number(v) || 0);
   }
 
   setEngineVolume(v) {
@@ -297,7 +303,7 @@ export class GameAudio {
     // ---- WIND: the cue for how fast you are actually going. Kept well under
     // the engine — it is a background rush, not a second engine.
     const w = Math.pow(clamp(speed01, 0, 1), 1.6);
-    this.windGain.gain.setTargetAtTime(w * 0.145 + p.boost * 0.05, t, 0.1);
+    this.windGain.gain.setTargetAtTime((w * 0.145 + p.boost * 0.05) * this.windVol, t, 0.1);
     this.windHP.frequency.setTargetAtTime(420 + w * 1700, t, 0.1);
   }
 
