@@ -149,11 +149,23 @@ console.log('\nCLUTCH KICK');
   check('a straight-line clutch dump does not spin the car',
     straight.absSlip < 0.16, `slip ${(straight.absSlip * 57.3).toFixed(1)} deg`);
 
-  // and it must not fire from a standing start
+  // A standing start is the one place you would actually drop a clutch, so it
+  // must fire there. It used to be gated above 7 m/s and did nothing at all.
   const still = new CarState();
-  run(still, 0.4, inp({ throttle: 1, clutch: 1 }));
+  run(still, 1.2, inp({ throttle: 1, clutch: 1 }));
+  const revvedUp = still.rpm;
   stepCar(still, inp({ throttle: 1, clutch: 0 }), dt, ROAD);
-  check('no kick below the speed threshold', !still.clutchKicked);
+  check('a standing-start clutch dump does kick', still.clutchKicked,
+    `${revvedUp.toFixed(0)} rpm`);
+  run(still, 1.0, inp({ throttle: 1, clutch: 0 }));
+  check('and it lights the tyres up', still.wheelspin > 0.3,
+    `wheelspin ${still.wheelspin.toFixed(2)} at ${(still.speed * 3.6).toFixed(0)} km/h`);
+
+  // but not with the clutch still in, and not off throttle
+  const noThrottle = new CarState();
+  run(noThrottle, 1.2, inp({ throttle: 1, clutch: 1 }));
+  stepCar(noThrottle, inp({ throttle: 0, clutch: 0 }), dt, ROAD);
+  check('a dump with no throttle does not kick', !noThrottle.clutchKicked);
 }
 
 // ---- 7. manual gearbox ----
