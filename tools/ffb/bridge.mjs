@@ -218,7 +218,20 @@ function initWheel(ws) {
  * power cycle to undo), no input reads, and a clean release on exit.
  */
 function tryConnect(ws) {
-  if (wheelForce || !wsRef) return;
+  if (!wsRef) return;
+
+  // A wheel that has gone away must be released, or we keep writing into a
+  // dead handle forever while the status endpoint still claims it is there.
+  if (wheelForce && !wheelForce.connected) {
+    console.log('  Wheel disconnected — releasing it and looking again.');
+    wheelForce = null;
+    wheelState.present = false;
+    wheelState.name = '';
+    ws.broadcast({ t: 'hello', wheel: '', ffb: false });
+    scheduleRetry();
+    return;
+  }
+  if (wheelForce) return;
 
   const wf = new WheelForce({ verbose: true, iface: IFACE, allowInit: ALLOW_INIT });
   if (!wf.open()) {
@@ -271,7 +284,7 @@ const server = http.createServer((req, res) => {
   if (req.url === '/ffb-status') {
     res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
     res.end(JSON.stringify({
-      wheel: wheelState.present, name: wheelState.name,
+      wheel: !!(wheelForce && wheelForce.connected), name: wheelState.name,
       clients: ws.clients.size, buttons: BUTTON_COUNT,
       forceFrames: diag.forceFrames,
       lastTorque: diag.lastTorque,
@@ -340,7 +353,8 @@ ws.on('message', (client, raw) => {
    If the browser tab dies, or the game is paused, nothing would
    ever tell the wheel to stop. Force is cut automatically.        */
 setInterval(() => {
-  if (!wheelForce || !wheelForce.connected) return;
+  // Recover from a wheel that was unplugged or powered off mid-session.
+  if (!wheelForce || !wheelForce.connected) { tryConnect(ws); return; }
   // If the browser goes away nothing would ever tell the wheel to stop.
   if (Date.now() - lastForceAt > 600) {
     wheelForce.forceConstant(0.5);

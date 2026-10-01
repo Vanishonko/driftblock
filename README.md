@@ -204,6 +204,25 @@ Two kinds, and they are the same mechanism seen from different speeds:
 
 A brake applied on its own still stops the car normally.
 
+### Mini-turbo
+
+GARAGE ▸ AUDIO ▸ **MINI-TURBO**:
+
+- **AUTO** — fires when you leave a charged drift, or on your button.
+- **BUTTON** — only when you press it.
+- **OFF** — no mini-turbo at all.
+
+The automatic release happens at exactly the moment you are trying to settle
+the car, which is not always what you want, hence the switch.
+
+### Fullscreen
+
+The game goes fullscreen when you hit START ENGINE — that click is a user
+gesture, which is what the browser requires. `F` toggles it at any time, and
+GARAGE ▸ DISPLAY has a button. A browser window is not a screen: the canvas
+fills the window, so if the window is not fullscreen you get desktop around
+the edges.
+
 ### Reverse
 
 Reverse is a **gear**, not a pedal. Braking never selects it: hold the brake for

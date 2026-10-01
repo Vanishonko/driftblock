@@ -266,6 +266,8 @@ export class Input {
     // H-pattern: a direct gear position, if one is selected
     this.state.gearRequest = this.lastWheelSample ? (this.lastWheelSample.gearRequest ?? 0) : 0;
 
+    this.state.fullscreenToggle = this.pressedThisFrame.has('KeyF');
+
     this.state.reset = this.pressedThisFrame.has('KeyR') || wheelReset;
     this.state.camToggle = this.pressedThisFrame.has('KeyC') || wheelCam;
     this.state.pause = this.pressedThisFrame.has('Escape') || this.pressedThisFrame.has('KeyP');

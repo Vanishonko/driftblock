@@ -57,7 +57,7 @@ function applyTune(id) {
    SAVE
    ============================================================ */
 const SAVE_KEY = 'driftblock.v1';
-const DEFAULT_SAVE = { paint: 'magenta', tune: 'balanced', bests: {}, wheel: null, volume: 0.9, engineVol: 1.15, uiScale: null, gearbox: false };
+const DEFAULT_SAVE = { paint: 'magenta', tune: 'balanced', bests: {}, wheel: null, volume: 0.9, engineVol: 1.15, boostMode: 'auto', uiScale: null, gearbox: false };
 
 function loadSave() {
   try {
@@ -331,6 +331,34 @@ function buildGarage() {
     };
     mk('MASTER VOLUME', () => save.volume, (v) => { save.volume = v; audio.setMasterVolume(v); });
     mk('ENGINE VOLUME', () => save.engineVol, (v) => { save.engineVol = v; audio.setEngineVolume(v); });
+
+    // ---- mini-turbo. It fires on its own when you leave a charged drift,
+    // which is not always what you want mid-corner.
+    const brow = document.createElement('div');
+    brow.className = 'settings-row';
+    brow.innerHTML = '<span class="settings-label">MINI-TURBO</span>';
+    const seg = document.createElement('div');
+    seg.className = 'seg';
+    for (const [val, label, hint] of [
+      ['auto', 'AUTO', 'Fires when you leave a charged drift, or on your button'],
+      ['manual', 'BUTTON', 'Only fires when you press the button'],
+      ['off', 'OFF', 'No mini-turbo at all'],
+    ]) {
+      const b = document.createElement('button');
+      b.className = 'seg-btn' + ((save.boostMode || 'auto') === val ? ' on' : '');
+      b.textContent = label;
+      b.title = hint;
+      b.onclick = () => {
+        save.boostMode = val;
+        writeSave(save);
+        if (game) game.boostMode = val;
+        audio.ui('select');
+        buildGarage();
+      };
+      seg.appendChild(b);
+    }
+    brow.appendChild(seg);
+    ah.appendChild(brow);
   }
 
   // ---- display / UI scale
@@ -358,6 +386,26 @@ function buildGarage() {
     input.oninput = () => apply(parseFloat(input.value), true);
     row.appendChild(input); row.appendChild(out);
     dh.appendChild(row);
+
+    // ---- fullscreen
+    const frow = document.createElement('div');
+    frow.className = 'settings-row';
+    frow.innerHTML = '<span class="settings-label">FULLSCREEN</span>';
+    const fbtn = document.createElement('button');
+    fbtn.className = 'btn';
+    fbtn.textContent = isFullscreen() ? 'EXIT FULLSCREEN  (F)' : 'GO FULLSCREEN  (F)';
+    fbtn.onclick = () => {
+      toggleFullscreen();
+      setTimeout(() => { fbtn.textContent = isFullscreen() ? 'EXIT FULLSCREEN  (F)' : 'GO FULLSCREEN  (F)'; }, 250);
+    };
+    frow.appendChild(fbtn);
+    dh.appendChild(frow);
+
+    const fhint = document.createElement('p');
+    fhint.className = 'wheel-hint';
+    fhint.innerHTML = 'The game starts fullscreen by default. ' +
+      '<code>F</code> toggles it at any time.';
+    dh.appendChild(fhint);
 
     const autoBtn = document.createElement('button');
     autoBtn.className = 'btn btn-ghost';
@@ -422,6 +470,9 @@ function startRun(trackDef, mode) {
   requestAnimationFrame(() => {
     if (!track || track.def.id !== trackDef.id) loadWorld(trackDef);
     game.manualGearbox = !!save.gearbox;
+    game.boostMode = save.boostMode || 'auto';
+    // this click is a user gesture, so it is the right moment to go fullscreen
+    if (save.fullscreen !== false && !isFullscreen()) requestFullscreen();
     game.start(mode);
     camRig.snap(game.car);
     if (ffb.bridge.status === 'on') ffb.bridge.setRange(wheel.cal.rangeDeg);
@@ -559,6 +610,44 @@ overlay.addEventListener('click', (e) => {
 const MAX_BUFFER_PIXELS = 5.5e6;
 let lastUiScale = 1;
 let lastAutoScale = 1;
+
+/* ============================================================
+   FULLSCREEN
+   ============================================================
+   A browser window is not a screen. The canvas fills whatever the
+   window is, but if the window is not fullscreen you get desktop
+   around the edges. Asking needs a user gesture, so the natural place
+   is the click that starts a run.
+   ============================================================ */
+function isFullscreen() {
+  return !!(document.fullscreenElement || document.webkitFullscreenElement);
+}
+
+function requestFullscreen() {
+  const el = document.documentElement;
+  const go = el.requestFullscreen || el.webkitRequestFullscreen;
+  if (!go) return false;
+  try {
+    const r = go.call(el, { navigationUI: 'hide' });
+    if (r && r.catch) r.catch(() => { /* the driver declined; fine */ });
+    return true;
+  } catch { return false; }
+}
+
+function exitFullscreen() {
+  const go = document.exitFullscreen || document.webkitExitFullscreen;
+  if (!go) return;
+  try { go.call(document); } catch { /* already out */ }
+}
+
+function toggleFullscreen() {
+  if (isFullscreen()) exitFullscreen(); else requestFullscreen();
+}
+
+/** Keep the canvas matched to the screen when we enter or leave. */
+for (const ev of ['fullscreenchange', 'webkitfullscreenchange']) {
+  document.addEventListener(ev, () => setTimeout(resize, 60));
+}
 
 function resize() {
   // Measure the element the canvas actually lives in rather than trusting
@@ -717,6 +806,8 @@ function frameBody(now) {
   last = now;
 
   input.update(rawDt);
+
+  if (input.state.fullscreenToggle) toggleFullscreen();
 
   if (input.state.pause) {
     if (game && game.state === 'running') {

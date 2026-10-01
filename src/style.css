@@ -577,3 +577,17 @@ html, body {
 }
 #crashBox span { color: #ff9d9d; font-size: 11px; opacity: .85; }
 #crashBox em { color: #ffb3b3; font-size: 11px; font-style: normal; opacity: .7; }
+
+/* ---- segmented control (mini-turbo mode) ---- */
+.seg { display: flex; gap: 0; }
+.seg-btn {
+  appearance: none; cursor: pointer;
+  padding: 5px 11px; font: 700 10px/1 ui-monospace, Menlo, monospace;
+  letter-spacing: .1em; color: var(--dim, #8b93a7);
+  background: rgba(255,255,255,.05);
+  border: 1px solid var(--line); border-right: none;
+}
+.seg-btn:first-child { border-radius: 3px 0 0 3px; }
+.seg-btn:last-child { border-right: 1px solid var(--line); border-radius: 0 3px 3px 0; }
+.seg-btn:hover { color: #dfe6f5; background: rgba(255,255,255,.10); }
+.seg-btn.on { color: #06121a; background: #2fe0ff; border-color: #2fe0ff; }

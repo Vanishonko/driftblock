@@ -268,7 +268,8 @@ export class Game {
     const activeSlip = s.absSlip > TUNE.driftSlip && s.speed > 7;
 
     // manual mini-turbo release
-    if (input.boost > 0.5 && this.charge >= SCORE.chargeTiers[0] && !this._boostHeld) {
+    const boostOn = (this.boostMode || 'auto') !== 'off';
+    if (boostOn && input.boost > 0.5 && this.charge >= SCORE.chargeTiers[0] && !this._boostHeld) {
       this._fireTurbo();
       this._boostHeld = true;
     }
@@ -359,8 +360,11 @@ export class Game {
       this._pendingFloat = { text: '+' + banked.toLocaleString(), t: 0.9 };
     }
 
-    // auto mini-turbo on exit
-    if (this.charge >= SCORE.chargeTiers[0]) this._fireTurbo();
+    // Auto mini-turbo on exit. Off unless the driver asked for it — it fires
+    // at exactly the moment you are trying to settle the car.
+    if ((this.boostMode || 'auto') === 'auto' && this.charge >= SCORE.chargeTiers[0]) {
+      this._fireTurbo();
+    }
 
     this.driftTime = 0;
     this.driftScore = 0;

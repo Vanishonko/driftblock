@@ -280,7 +280,7 @@ export class HUD {
 
     // ---- gear
     const g = d.gear | 0;
-    const label = g < 0 ? 'R' : g === 0 ? 'N' : String(g || 1);
+    const label = g < 0 ? 'R' : g === 0 ? 'N' : String(g);
     c.fillStyle = g <= 0 ? '#ffcc33' : '#2fe0ff';
     c.font = '900 56px ui-monospace, Menlo, monospace';
     c.fillText(label, cx, cy + 112);

@@ -99,6 +99,8 @@ export class WheelForce {
     this.allowInit = allowInit;
     this.writes = 0;
     this.writeErrors = 0;
+    this.failStreak = 0;
+    this.dead = false;
     this.lastError = '';
     this._lastConstant = null;
     this._lastFriction = null;
@@ -169,12 +171,27 @@ export class WheelForce {
     try {
       this.device.write(bytes);
       this.writes++;
+      this.failStreak = 0;
       return true;
     } catch (e) {
       this.writeErrors++;
       this.lastError = e.message;
+      // The wheel was unplugged, powered off, or the handle went stale. Drop
+      // it so the owner can notice and reconnect: otherwise we sit here
+      // writing into a dead handle forever while still reporting the wheel
+      // as present, and the driver feels nothing but the wheel's own spring.
+      if (++this.failStreak >= 3) this.markDead();
       return false;
     }
+  }
+
+  /** The handle is no longer usable. Safe to call repeatedly. */
+  markDead() {
+    if (this.device) {
+      try { this.device.close(); } catch { /* already gone */ }
+    }
+    this.device = null;
+    this.dead = true;
   }
 
   /** @param {number} v 0..1 — 0 full left, 0.5 no force, 1 full right */
