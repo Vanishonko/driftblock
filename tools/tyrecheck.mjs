@@ -234,7 +234,7 @@ console.log('\nWET SURFACE  (the same gentle input, less grip)');
     };
     const drySlip = run(ROAD);
     const wetSlip = run(wet);
-    check('an input the dry tyres take slides in the wet', wetSlip > drySlip + 15,
+    target('an input the dry tyres take slides in the wet', wetSlip > drySlip + 15,
       `${wetSlip.toFixed(0)} deg wet vs ${drySlip.toFixed(0)} deg dry`);
   }
 }

@@ -27,20 +27,10 @@ export const TUNE = {
   torquePeakAt: 0.62,    // rpm01 where the engine makes best torque
   torqueFalloff: 0.55,   // how much torque is lost either side of the peak
 
-  // ---- tyres. See physics/tyres.js: one friction circle decides how the
-  // available grip is shared between going and turning. Everything that used
-  // to be a separate grip rule — throttle, handbrake, clutch kick — falls out
-  // of these numbers instead.
-  muLong: 9.2,           // m/s^2 of longitudinal grip on tarmac
-  muLat: 30,             // m/s^2 of cornering grip
-  tyrePeakSlip: 0.20,    // rad (~11 deg) where cornering force peaks
-  tyreFalloff: 0.50,     // how fast cornering force dies past the peak
-  tyreMinStiffness: 0.40,// it never reaches zero, or a slide could not be caught
-  tyreOverloadSpan: 1.2, // how far past the limit counts as fully overloaded
-  lockLatLoss: 0.85,     // lateral budget a fully locked rear gives up
-  tyreSlipSpan: 0.55,    // how far past the limit reads as fully spinning
-  tyreSlidePeakShift: 0.60, // how far the grip peak drops once sliding
-  tyreRegripRate: 0.40,  // how fast a slide re-plants once you stop asking
+  // ---- traction. Demand more force than the tyres can take and they spin
+  // instead of gripping — which is what a burnout is.
+  tractionLimit: 9.2,    // m/s^2 of longitudinal grip on tarmac
+  wheelspinGripLoss: 0.42,  // drive lost once the tyres are lit
   wheelspinRise: 3.4,
   wheelspinFall: 2.6,
   burnoutBrake: 0.30,    // brake held past this + throttle = standstill burnout
@@ -63,21 +53,27 @@ export const TUNE = {
   alignHandbrake: 0.50,  // rear grip gone => almost no self-align
   yawAirDamp: 2.4,
 
-  // ---- cornering
-  // The base slip-decay rate: how fast the tyres pull the velocity vector
-  // back in line with the car, before the friction circle scales it down.
-  gripBase: 8.2,
-  // How strongly a lit rear tyre keeps the car rotating into the slide. Fed
-  // by the friction circle's overload, so it only applies when the tyres are
-  // genuinely out of grip.
-  driftSustain: 0.58,
-  scrub: 3.5,             // m/s^2 lost at 90 deg of slip (scaled by speed)
+  // ---- grip (exponential decay rate of lateral velocity, 1/s)
+  gripNormal: 8.2,
+  gripPower: 1.95,
+  slideDecay: 0.85,      // how fast a slide re-plants once you stop asking
+  driftSustain: 0.56,    // how strongly throttle keeps the car rotating in a slide        // throttle held mid-drift
+  gripCoast: 1.80,        // coasting mid-drift
+  gripHandbrake: 1.70,
+  // The rear tyres start to let go once the driver asks for a lot of yaw
+  // *and* a lot of power at speed. Without this the "sliding" grip values
+  // could only be reached after you were already sideways, which made the
+  // handbrake the only way to start a drift.
+  gripDemandLo: 0.26,
+  gripDemandHi: 0.78,
+  scrub: 9.0,             // m/s^2 lost at 90 deg of slip (scaled by speed)
 
   // ---- drivetrain
   yawRampSpeed: 7.0,      // speed at which steering reaches full authority
 
   // ---- handbrake
   handbrakeDecel: 5.2,
+  handbrakeKick: 1.15,   // instantaneous yaw flick on pull
 
   // ---- mini-turbo
   boostTime: 1.6,        // seconds of boost
@@ -94,7 +90,6 @@ export const TUNE = {
   // ---- surfaces
   surface: {
     road: { grip: 1.0, roll: 1.0, power: 1.0, dragAccel: 0.0 },
-    wet: { grip: 0.62, roll: 0.9, power: 0.97, dragAccel: 0.0 },
     grass: { grip: 0.45, roll: 1.9, power: 0.85, dragAccel: 1.5 },
   },
 
@@ -111,10 +106,12 @@ export const TUNE = {
   // simply using too much throttle.
   clutchEngageLo: 0.35,  // pedal travel below this is fully engaged
   clutchEngageHi: 0.75,  // above this the drivetrain is fully disengaged
-  // A dumped clutch is an event, not a special grip rule: it lands a slug of
-  // torque through the drivetrain, and the friction circle turns that into
-  // wheelspin and lost cornering grip by itself. Nothing is injected.
+  clutchKickTime: 0.50,
+  clutchKickGrip: 0.55,  // rear grip multiplier during the kick
+  clutchKickYaw: 1.25,
+  clutchKickTorque: 11,  // m/s^2 of extra drive while the kick lasts
   clutchKickMinRpm: 0.30,
+  clutchKickMinSpeed: 7,
 
   // Manual gearbox: the driver picks the gear, and shifting without the
   // clutch costs you a jolt and a moment of drive.

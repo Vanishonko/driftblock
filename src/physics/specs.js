@@ -28,15 +28,15 @@ export const SPECS = [
   },
   {
     id: 'drift', name: 'DRIFT SPEC', desc: 'Loose rear, faster steering, more yaw. Slides start instantly and hold forever.',
-    mods: { muLat: 0.84, gripBase: 0.92, tyreRegripRate: 0.80, maxYawRate: 1.10, alignK: 0.82, engineAccel: 0.96 },
+    mods: { gripNormal: 0.82, gripPower: 0.86, gripHandbrake: 0.88, maxYawRate: 1.10, alignK: 0.82, engineAccel: 0.96 },
   },
   {
     id: 'grip', name: 'GRIP SPEC', desc: 'More mechanical grip and a higher redline. Quicker lap times, harder to break traction.',
-    mods: { muLong: 1.18, muLat: 1.20, tyreRegripRate: 1.25, topSpeed: 1.06, engineAccel: 1.06, maxYawRate: 0.94 },
+    mods: { gripNormal: 1.16, gripPower: 1.10, gripHandbrake: 1.14, topSpeed: 1.06, engineAccel: 1.06, maxYawRate: 0.94 },
   },
   {
     id: 'monster', name: 'MONSTER', desc: 'Absurd power, absurd top end, absurd consequences. Good luck.',
-    mods: { engineAccel: 1.34, topSpeed: 1.14, muLat: 0.90, maxYawRate: 1.06, brakeAccel: 1.08 },
+    mods: { engineAccel: 1.34, topSpeed: 1.14, gripNormal: 0.88, gripPower: 0.92, maxYawRate: 1.06, brakeAccel: 1.08 },
   },
 ];
 

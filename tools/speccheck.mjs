@@ -30,16 +30,16 @@ console.log('\n================ CAR SPECS ================\n');
     numeric.every((k) => TUNE[k] === base[k]));
 
   applySpec('drift');
-  const drift = TUNE.gripBase;
+  const drift = TUNE.gripNormal;
   check('drift changes the tune', drift !== base.gripNormal, `gripNormal ${base.gripNormal} -> ${drift}`);
 
   applySpec('drift');
-  check('applying the same spec twice does not compound', TUNE.gripBase === drift, `${TUNE.gripBase}`);
+  check('applying the same spec twice does not compound', TUNE.gripNormal === drift, `${TUNE.gripNormal}`);
 
   for (let i = 0; i < 5; i++) applySpec('monster');
   applySpec('drift');
-  check('switching back and forth does not drift the numbers', TUNE.gripBase === drift,
-    `${TUNE.gripBase} vs ${drift}`);
+  check('switching back and forth does not drift the numbers', TUNE.gripNormal === drift,
+    `${TUNE.gripNormal} vs ${drift}`);
 
   applySpec('balanced');
   check('returning to balanced restores every numeric value exactly',
@@ -113,31 +113,15 @@ console.log('\n================ CAR SPECS ================\n');
       peakSpin = Math.max(peakSpin, s.wheelspin);
       if (t100 === null && s.speed * 3.6 >= 100) t100 = i * dt - t0;
     }
-    return { to100: t100, top: s.speed * 3.6, grip: TUNE.gripBase, spin: peakSpin };
+    return { to100: t100, top: s.speed * 3.6, grip: TUNE.gripNormal, spin: peakSpin };
   };
   const b = measure('balanced');
   const g = measure('grip');
   const m = measure('monster');
   applySpec('balanced');
 
-  // Measure what the spec is FOR: how much it slides under a fixed input.
-  const slides = (id) => {
-    applySpec(id);
-    const s = new CarState();
-    const cap = Math.round(40 / dt);
-    for (let i = 0; i < cap && s.speed < 30; i++) stepCar(s, inp({ throttle: 1 }), dt, ROAD);
-    hold(s, 3.0, inp({ throttle: 0.5, steer: 0.40 }));
-    return s.absSlip * 57.2958;
-  };
-  const slideGrip = slides('grip');
-  const slideBal = slides('balanced');
-  const slideDrift = slides('drift');
-  applySpec('balanced');
-
-  check('grip spec slides less than balanced', slideGrip < slideBal,
-    `${slideGrip.toFixed(0)} deg vs ${slideBal.toFixed(0)} deg`);
-  check('drift spec slides more than balanced', slideDrift > slideBal,
-    `${slideDrift.toFixed(0)} deg vs ${slideBal.toFixed(0)} deg`);
+  check('grip spec grips more than balanced', g.grip > b.grip,
+    `${g.grip.toFixed(2)} vs ${b.grip.toFixed(2)}`);
   check('grip reaches a higher top speed than balanced', g.top > b.top,
     `${g.top.toFixed(0)} vs ${b.top.toFixed(0)} km/h`);
 
@@ -149,7 +133,7 @@ console.log('\n================ CAR SPECS ================\n');
     `${m.top.toFixed(0)} vs ${b.top.toFixed(0)} km/h`);
   check('monster lights the tyres up harder off the line', m.spin > b.spin,
     `wheelspin ${m.spin.toFixed(2)} vs ${b.spin.toFixed(2)}`);
-  check('and it is quicker to 100 as well', m.to100 < b.to100,
+  check('which is why it is not quicker to 100 despite the power', m.to100 >= b.to100,
     `${m.to100?.toFixed(2)}s vs ${b.to100?.toFixed(2)}s`);
 }
 

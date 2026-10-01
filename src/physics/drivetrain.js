@@ -98,19 +98,18 @@ export function updateDrivetrain(s, input, h) {
   const disengaged = clamp((clutch - T.clutchEngageLo) / (T.clutchEngageHi - T.clutchEngageLo), 0, 1);
   s.clutch = clutch;
 
-  // Dumping the clutch at revs. This is an EVENT, not a grip rule: it lands a
-  // slug of torque through the drivetrain, the engine's demand jumps, and the
-  // friction circle turns that into wheelspin and lost cornering grip on its
-  // own. Nothing is injected — no yaw, no grip multiplier, no bonus drive.
-  //
-  // It used to be gated above 7 m/s, so a standing-start dump did nothing at
-  // all; there is no speed gate now, because the physics does not need one.
+  // Dumping the clutch at revs shocks the rear tyres loose.
   const prev = s._prevClutch || 0;
+  // No speed gate. It used to require 7 m/s, so dropping the clutch from a
+  // standstill — the one place you would actually do it — did nothing at all.
   if (prev > T.clutchEngageHi && clutch < T.clutchEngageLo
       && throttle > 0.4 && s.rpm01 > T.clutchKickMinRpm) {
+    s.clutchKick = T.clutchKickTime;
     s.clutchKicked = true;                      // consumed once by the caller
+    s.yawRate += s.steer * T.clutchKickYaw * clamp(s.speed / 20, 0, 1.2);
   }
   s._prevClutch = clutch;
+  s.clutchKick = Math.max(0, s.clutchKick - h);
 
   // A disengaged clutch lets the engine spin freely, so it answers the
   // throttle even at a standstill.

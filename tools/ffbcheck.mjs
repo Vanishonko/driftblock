@@ -128,11 +128,7 @@ for (const sign of [1, -1]) {
   tested++;
   const obeyHelps = obey.after < obey.before;
   const fightHelps = fight.after < fight.before;
-  // "Obeying helps" is the real assertion. Requiring that fighting helps
-  // *not at all* is too strict: a big slide bleeds angle on its own, so
-  // fighting it can still shave a little. What matters is that obeying does
-  // substantially better.
-  const verdict = obeyHelps && obey.after < fight.after * 0.8;
+  const verdict = obeyHelps && !fightHelps;
   if (verdict) obeyWins++;
   console.log(`  slip ${sign > 0 ? '+' : '-'}${obey.before.toFixed(2)} rad  torque ${obey.torque >= 0 ? '+' : ''}${obey.torque.toFixed(3)}` +
     `  -> obeying: ${obey.after.toFixed(2)}   fighting: ${fight.after.toFixed(2)}   ${verdict ? 'HELPS' : 'WRONG WAY'}`);
