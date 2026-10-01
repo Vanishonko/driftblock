@@ -210,6 +210,19 @@ Reverse is a **gear**, not a pedal. Braking never selects it: hold the brake for
 four seconds at a standstill and nothing happens. In manual, shift down past
 1st (or use the R gate on an H-pattern) and the throttle drives you backwards.
 
+### When something breaks
+
+The frame loop re-arms `requestAnimationFrame` **before** running its body, and
+the body is wrapped in a `try/catch`. That is not defensive habit — it is a bug
+fix. A single thrown error used to stop the loop being re-armed, killing it for
+good: the game sat frozen on its last frame with steering, pedals, buttons and
+even Escape all dead, while the UI still showed whatever it last rendered. That
+is indistinguishable from "my wheel stopped working", and it sent us chasing a
+force-feedback fault that was really a `ReferenceError` in the smoke code.
+
+Now a throw is caught, the loop keeps running, and a banner names the error and
+where it came from. A crash can no longer be silent.
+
 ### Sense of speed
 
 The lens does most of the work. Field of view opens from 68° to about 102° across

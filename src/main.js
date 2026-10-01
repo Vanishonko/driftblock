@@ -666,8 +666,53 @@ let last = performance.now();
 let floatCd = 0;
 let ffbTick = 0;
 
+/* ============================================================
+   FRAME LOOP — AND WHY IT IS WRAPPED IN A try/catch
+   ============================================================
+   A single thrown error inside the loop used to stop
+   requestAnimationFrame being re-armed, which killed the loop for good.
+   The game then sat frozen on its last frame: steering, pedals, buttons
+   and even Escape all dead, with the UI still showing whatever it last
+   rendered. That is indistinguishable from "my wheel stopped working",
+   and it sent us chasing a force-feedback bug that was really a
+   ReferenceError in the smoke code.
+
+   Re-arming FIRST means the loop survives anything the body does, and
+   the error is put on screen so it can never fail silently again.
+   ============================================================ */
+let frameErrors = 0;
+function reportFrameError(err) {
+  frameErrors++;
+  const msg = (err && err.message) || String(err);
+  const where = (err && err.stack) ? String(err.stack).split('\n')[1] : '';
+  console.error('[DRIFTBLOCK] frame error:', err);
+
+  let box = document.getElementById('crashBox');
+  if (!box) {
+    box = document.createElement('div');
+    box.id = 'crashBox';
+    document.body.appendChild(box);
+  }
+  box.innerHTML =
+    '<b>Something broke in the game loop</b>' +
+    `<code>${msg}</code>` +
+    `<span>${where.trim()}</span>` +
+    `<em>The game keeps running so you can save and report this. ` +
+    `${frameErrors} error${frameErrors === 1 ? '' : 's'} so far.</em>`;
+  box.classList.add('show');
+}
+
 function frame(now) {
+  // re-arm BEFORE the body, so a throw cannot kill the loop
   requestAnimationFrame(frame);
+  try {
+    frameBody(now);
+  } catch (err) {
+    reportFrameError(err);
+  }
+}
+
+function frameBody(now) {
   const rawDt = Math.min(0.05, (now - last) / 1000);
   last = now;
 
