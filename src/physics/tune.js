@@ -36,6 +36,21 @@ export const TUNE = {
   burnoutBrake: 0.30,    // brake held past this + throttle = standstill burnout
   burnoutSpeed: 6.0,
   rollingBurnoutSpeed: 34,  // a brake stand keeps the rears lit up to here
+
+  // ---- launch. Dropping the clutch at a standstill leaves the tyres
+  // spinning against very little load: the car creeps and the engine screams
+  // before it hooks up and goes.
+  //
+  // DELIBERATELY LONGITUDINAL ONLY. An earlier attempt at this coupled the
+  // drive and the cornering grip through a shared friction budget, and it
+  // inverted the whole drift envelope — full throttle understeered where it
+  // used to drift, while half throttle span. The lateral model here is tuned
+  // and stays exactly as it is; this only ever scales the drive.
+  launchTime: 1.5,          // seconds for the launch state to bleed off
+  launchHookupSpeed: 15,    // m/s at which the tyres have fully hooked up
+  launchDriveCut: 0.80,     // fraction of drive lost at a standstill
+  launchSpin: 0.95,         // wheelspin a standing-start dump produces
+  launchMaxSpeed: 8,        // above this a dump is the at-speed kick instead
   reverseAccel: 4.5,
   maxReverse: 13,
   reverseHoldTime: 1.20,   // brake held this long while stopped selects reverse

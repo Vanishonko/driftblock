@@ -316,4 +316,52 @@ console.log('\nNEUTRAL + ROLLING BURNOUTS');
     `${(stop.speed * 3.6).toFixed(1)} km/h after 4 s of braking`);
 }
 
+// ---- 10. the launch -------------------------------------------------
+console.log('\nCLUTCH-DUMP LAUNCH');
+{
+  const hold = (s, sec, input) => { for (let i = 0; i < Math.round(sec / dt); i++) stepCar(s, input, dt, ROAD); };
+  const revUp = () => {
+    const s = new CarState();
+    s.manual = true; s.playerGear = 1;
+    hold(s, 1.2, inp({ throttle: 1, clutch: 1, manual: true }));
+    return s;
+  };
+
+  // The same dump with the launch behaviour suppressed, so this compares the
+  // launch against itself rather than against a different start entirely.
+  const noLaunch = revUp();
+  stepCar(noLaunch, inp({ throttle: 1, clutch: 0, manual: true }), dt, ROAD);
+  for (let i = 0; i < Math.round(0.4 / dt); i++) {
+    noLaunch.launch = 0;
+    stepCar(noLaunch, inp({ throttle: 1, clutch: 0, manual: true }), dt, ROAD);
+  }
+  const plainEarly = noLaunch.speed * 3.6;
+
+  const s = revUp();
+  const revved = s.rpm;
+  stepCar(s, inp({ throttle: 1, clutch: 0, manual: true }), dt, ROAD);
+  hold(s, 0.4, inp({ throttle: 1, clutch: 0, manual: true }));
+  const early = { speed: s.speed * 3.6, spin: s.wheelspin };
+  hold(s, 1.2, inp({ throttle: 1, clutch: 0, manual: true }));
+  const later = s.speed * 3.6;
+
+  check('the engine is up on the revs before the dump', revved > 4000, `${revved.toFixed(0)} rpm`);
+  check('the tyres light up straight away', early.spin > 0.35, `wheelspin ${early.spin.toFixed(2)}`);
+  check('and the car creeps instead of just going', early.speed < plainEarly * 0.75,
+    `${early.speed.toFixed(1)} km/h vs ${plainEarly.toFixed(1)} km/h with the launch suppressed`);
+  check('then it hooks up and goes', later > 35, `${later.toFixed(0)} km/h at 1.6 s`);
+
+  // the launch must not survive: a second dump-free run should be normal again
+  hold(s, 2.0, inp({ throttle: 1, clutch: 0, manual: true }));
+  check('and the launch state clears itself', s.launch === 0, `launch ${s.launch}`);
+
+  // 4th gear must NOT light up — too tall to break traction
+  const tall = new CarState();
+  tall.manual = true; tall.playerGear = 4;
+  hold(tall, 1.2, inp({ throttle: 1, clutch: 1, manual: true }));
+  stepCar(tall, inp({ throttle: 1, clutch: 0, manual: true }), dt, ROAD);
+  check('a dump in too tall a gear does not launch', tall.launch < 0.5,
+    `launch ${tall.launch.toFixed(2)}`);
+}
+
 console.log(fail===0 ? '\nRev model behaves like an engine.\n' : `\n${fail} FAILED\n`);

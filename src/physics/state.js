@@ -40,6 +40,7 @@ export class CarState {
     this.clutch = 0;
     this.clutchKick = 0;        // seconds of clutch-kick grip loss remaining
     this.wheelspin = 0;         // 0..1 how lit the rear tyres are
+    this.launch = 0;            // 0..1, a standing-start clutch dump bleeding off
     this.slideHold = 0;         // sticky slide state — see stepCar
     this.reverseHold = 0;       // brake held while stopped, to engage reverse
     this.limiterCut = 0;

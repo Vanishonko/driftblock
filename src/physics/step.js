@@ -192,12 +192,28 @@ export function stepCar(s, input, dt, surf) {
     const rolling = 1 - clamp(Math.abs(vf) / T.rollingBurnoutSpeed, 0, 1);
     spinTarget = Math.max(spinTarget, 0.45 + rolling * 0.55);
   }
+  // A dumped clutch at a standstill: the engine is spinning the wheels, not
+  // the road. The tyres are lit, the engine screams, and the car creeps —
+  // then it hooks up and goes as speed builds.
+  //
+  // This scales the DRIVE ONLY. The lateral grip blend is untouched on
+  // purpose: coupling the two is what inverted the drift envelope when it was
+  // tried, and the lateral model is tuned, so it stays exactly as it is.
+  let launchCut = 0;
+  if (s.launch > 0) {
+    const hookup = 1 - clamp(Math.abs(vf) / T.launchHookupSpeed, 0, 1);
+    spinTarget = Math.max(spinTarget, T.launchSpin * s.launch * hookup);
+    launchCut = s.launch * hookup;
+  }
+
   const spinRate = spinTarget > s.wheelspin ? T.wheelspinRise : T.wheelspinFall;
   s.wheelspin += (spinTarget - s.wheelspin) * (1 - Math.exp(-spinRate * h));
 
   if (demanded > 0) {
     // a spinning tyre pushes less than a gripping one
-    accel += Math.min(demanded, gripAvail * 1.35) * (1 - T.wheelspinGripLoss * s.wheelspin);
+    accel += Math.min(demanded, gripAvail * 1.35)
+      * (1 - T.wheelspinGripLoss * s.wheelspin)
+      * (1 - T.launchDriveCut * launchCut);
   }
 
   // ---- brakes.

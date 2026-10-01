@@ -107,7 +107,19 @@ export function updateDrivetrain(s, input, h) {
     s.clutchKick = T.clutchKickTime;
     s.clutchKicked = true;                      // consumed once by the caller
     s.yawRate += s.steer * T.clutchKickYaw * clamp(s.speed / 20, 0, 1.2);
+    // From a standstill this is a launch rather than a kick: the tyres light
+    // up and the car creeps before it hooks up. step.js turns this into drive
+    // and wheelspin, and deliberately touches nothing lateral.
+    //
+    // Gated on this gear actually being able to break traction. Dropping the
+    // clutch in 4th from a standstill just bogs — the demand there is around
+    // 4.8 m/s^2 against 9.2 of grip — so it must not launch.
+    if (s.speed < T.launchMaxSpeed) {
+      const ratio = T.gearRatios[clamp((s.gear | 0) - 1, 0, T.gearRatios.length - 1)];
+      if (T.engineAccel * ratio * engineTorque(s.rpm01) > T.tractionLimit) s.launch = 1;
+    }
   }
+  s.launch = Math.max(0, s.launch - h / T.launchTime);
   s._prevClutch = clutch;
   s.clutchKick = Math.max(0, s.clutchKick - h);
 
