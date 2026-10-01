@@ -1,7 +1,7 @@
 /* Fuzz the full Game loop headlessly to catch NaNs / blow-ups.
    Run:  node tools/fuzz.mjs [seconds] [seed]                       */
 
-import { TRACK_DEFS, Track } from '../src/track.js';
+import { TRACK_DEFS, Track } from '../src/render/track.js';
 import { Game, MODES } from '../src/game.js';
 import { CarState, stepCar, TUNE } from '../src/physics/index.js';
 

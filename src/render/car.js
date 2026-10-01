@@ -4,8 +4,8 @@
    steering, brake lights, boost flames).
    ============================================================ */
 
-import * as THREE from '../vendor/three.module.js';
-import { TUNE } from './physics/index.js';
+import * as THREE from '../../vendor/three.module.js';
+import { TUNE } from '../physics/index.js';
 
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 

@@ -4,7 +4,7 @@
    drift automatically frames the side of the car and the smoke.
    ============================================================ */
 
-import * as THREE from '../vendor/three.module.js';
+import * as THREE from '../../vendor/three.module.js';
 
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 const lerp = (a, b, t) => a + (b - a) * t;

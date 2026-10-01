@@ -5,15 +5,22 @@
 import * as THREE from '../vendor/three.module.js';
 import { Input } from './input.js';
 import { GameAudio } from './audio.js';
-import { TRACK_DEFS, Track, previewOutline } from './track.js';
-import { createCarMesh, updateCarVisual, PAINTS } from './car.js';
-import { ChaseCamera } from './camera.js';
-import { Effects } from './effects.js';
-import { HUD } from './hud.js';
+import { TRACK_DEFS, Track, previewOutline } from './render/track.js';
+import { createCarMesh, updateCarVisual, PAINTS } from './render/car.js';
+import { ChaseCamera } from './render/camera.js';
+import { Effects } from './render/effects.js';
+import { HUD } from './render/hud.js';
 import { Game, MODES, fmtTime, SCORE } from './game.js';
 import { TUNE, clamp, invalidateTopSpeed } from './physics/index.js';
 import { load as loadSettings, patch as patchSettings, flush as flushSettings } from './core/settings.js';
 import { SPECS, applySpec } from './physics/specs.js';
+import {
+  init as initGarage, buildGarage, buildSpecCards, changeSpec,
+} from './ui/garage.js';
+import {
+  attach as attachDisplay, resize, displayInfo, isFullscreen,
+  requestFullscreen, toggleFullscreen, applyFullscreenPreference,
+} from './core/display.js';
 import { WheelInput, defaultCalibration } from './wheel.js';
 import { ForceFeedback } from './ffb.js';
 import { WheelUI } from './wheelui.js';
@@ -91,6 +98,15 @@ let effects = null;
 let carMesh = null;
 let game = null;
 const camRig = new ChaseCamera(camera);
+
+// Sizing, DPR, UI scale and fullscreen live in core/display.js; it needs the
+// canvas, renderer and camera, but owns none of them.
+attachDisplay({ canvas, renderer, camera });
+
+initGarage({
+  save, audio, hud, flush: flushSettings,
+  getGame: () => game,
+});
 camRig.track = null;
 
 function loadWorld(trackDef) {
@@ -273,85 +289,6 @@ function buildTrackCards() {
     el.onmouseenter = () => audio.ui('move');
     host.appendChild(el);
     requestAnimationFrame(() => drawOutline(cv, def, '#' + new THREE.Color(def.palette.curbB).getHexString()));
-  }
-}
-
-function buildGarage() {
-  const ph = document.getElementById('paintCards');
-  ph.innerHTML = '';
-  for (const p of PAINTS) {
-    const el = document.createElement('button');
-    el.className = 'card' + (p.id === paint.id ? ' sel' : '');
-    const col = '#' + new THREE.Color(p.body).getHexString();
-    const acc = '#' + new THREE.Color(p.accent).getHexString();
-    el.innerHTML = `<div class="swatch" style="background:linear-gradient(90deg, ${col} 65%, ${acc} 65%)"></div>
-      <h3>${p.name}</h3>`;
-    el.onclick = () => {
-      patchSettings({ paint: p.id });
-      flushSettings();          // about to reload; do not lose the debounce
-      location.reload();
-    };
-    el.onmouseenter = () => audio.ui('move');
-    ph.appendChild(el);
-  }
-
-  buildSpecCards(document.getElementById('tuneCards'));
-}
-
-/**
- * Change the car spec. Safe to call mid-run: the spec only moves grip, yaw,
- * engine and brake values, none of which the car's mesh depends on, so the
- * car keeps its geometry, position and speed.
- *
- * The one piece of bookkeeping needed is the gearbox. A spec can change the
- * achievable top speed, which rescales every gear's redline speed, so the
- * selected gear may no longer exist or may now be out of range for the
- * current speed.
- *
- * @param {string} id
- */
-function changeSpec(id) {
-  const spec = applySpec(id);
-  patchSettings({ spec: id });
-
-  if (game && game.car) {
-    const maxGear = TUNE.gearRatios.length;
-    if (game.car.playerGear > maxGear) game.car.playerGear = maxGear;
-    if (game.car.playerGear < -1) game.car.playerGear = -1;
-    if (game.car.gear > maxGear) game.car.gear = maxGear;
-  }
-
-  hud.toast('SPEC: ' + spec.name, 1.4);
-  audio.ui('ok');
-  return spec;
-}
-
-/** Refresh every visible spec picker after a change. */
-function rebuildSpecPickers() {
-  buildSpecCards(document.getElementById('tuneCards'));
-  buildSpecCards(document.getElementById('pauseSpecCards'), { compact: true });
-}
-
-/**
- * The spec cards. Shared by the garage and the in-run pause picker, so a spec
- * change uses exactly the same UI in both places.
- * @param {HTMLElement} host
- * @param {{onPick?: () => void}} [opts]
- */
-function buildSpecCards(host, opts = {}) {
-  if (!host) return;
-  host.innerHTML = '';
-  for (const t of SPECS) {
-    const el = document.createElement('button');
-    el.className = 'card' + (t.id === save.spec ? ' sel' : '') + (opts.compact ? ' compact' : '');
-    el.innerHTML = `<h3>${t.name}</h3><div class="desc">${t.desc}</div>`;
-    el.onclick = () => {
-      changeSpec(t.id);
-      rebuildSpecPickers();
-      if (opts.onPick) opts.onPick();
-    };
-    el.onmouseenter = () => audio.ui('move');
-    host.appendChild(el);
   }
 }
 
@@ -664,146 +601,6 @@ overlay.addEventListener('click', (e) => {
       break;
   }
 });
-
-/* ============================================================
-   RESIZE
-   ============================================================ */
-/**
- * Fit the canvas to the window.
- *
- * Several things make this fussier than it looks on a multi-monitor sim
- * rig: devicePixelRatio changes when the window moves between displays,
- * macOS fullscreen animates so the final size arrives after the event,
- * and a 5K panel at dpr 2 would ask for a ~33 megapixel drawing buffer.
- * So: re-read dpr every time, set the CSS size explicitly rather than
- * trusting the stylesheet, cap the buffer area, and listen to more than
- * just `resize`.
- */
-const MAX_BUFFER_PIXELS = 5.5e6;
-let lastUiScale = 1;
-let lastAutoScale = 1;
-
-/* ============================================================
-   FULLSCREEN
-   ============================================================
-   A browser window is not a screen. The canvas fills whatever the
-   window is, but if the window is not fullscreen you get desktop
-   around the edges. Asking needs a user gesture, so the natural place
-   is the click that starts a run.
-   ============================================================ */
-function isFullscreen() {
-  return !!(document.fullscreenElement || document.webkitFullscreenElement);
-}
-
-function requestFullscreen() {
-  const el = document.documentElement;
-  const go = el.requestFullscreen || el.webkitRequestFullscreen;
-  if (!go) return false;
-  try {
-    const r = go.call(el, { navigationUI: 'hide' });
-    if (r && r.catch) r.catch(() => { /* the driver declined; fine */ });
-    return true;
-  } catch { return false; }
-}
-
-function exitFullscreen() {
-  const go = document.exitFullscreen || document.webkitExitFullscreen;
-  if (!go) return;
-  try { go.call(document); } catch { /* already out */ }
-}
-
-function toggleFullscreen() {
-  if (isFullscreen()) exitFullscreen(); else requestFullscreen();
-}
-
-/** Keep the canvas matched to the screen when we enter or leave. */
-for (const ev of ['fullscreenchange', 'webkitfullscreenchange']) {
-  document.addEventListener(ev, () => setTimeout(resize, 60));
-}
-
-function resize() {
-  // Measure the element the canvas actually lives in rather than trusting
-  // window.innerWidth/innerHeight, which can disagree with the real layout
-  // box on a scaled display and leave the canvas short of the viewport.
-  const host = canvas.parentElement || document.documentElement;
-  const box = host.getBoundingClientRect();
-  const w = Math.max(1, Math.round(box.width) || window.innerWidth || 1);
-  const h = Math.max(1, Math.round(box.height) || window.innerHeight || 1);
-
-  let dpr = Math.min(window.devicePixelRatio || 1, 2);
-  while (dpr > 1 && w * h * dpr * dpr > MAX_BUFFER_PIXELS) dpr -= 0.25;
-
-  renderer.setPixelRatio(dpr);
-  renderer.setSize(w, h, false);
-
-  // set the CSS size in pixels too, so the canvas cannot disagree with the
-  // window about how big it should be
-  const cv = renderer.domElement;
-  cv.style.width = w + 'px';
-  cv.style.height = h + 'px';
-
-  camera.aspect = w / h;
-  camera.updateProjectionMatrix();
-
-  applyUiScale(w, h);
-}
-
-/**
- * Size the HUD so it occupies a consistent fraction of the screen.
- *
- * The HUD is laid out in fixed pixels, so on a display whose CSS viewport is
- * much smaller than the panel — a scaled HiDPI mode, or browser zoom — it
- * balloons: the speedometer alone goes from 13% of the width at 1920 to 25%
- * at 1024. Scaling it keeps the interface the same relative size everywhere.
- */
-function applyUiScale(w, h) {
-  const auto = clamp(Math.min(w / 1920, h / 1080), 0.55, 1.35);
-  const manual = (typeof save.uiScale === 'number' && save.uiScale > 0) ? save.uiScale : null;
-  const ui = manual === null ? auto : clamp(manual, 0.4, 2);
-  document.documentElement.style.setProperty('--ui', ui.toFixed(3));
-  lastUiScale = ui;
-  lastAutoScale = auto;
-}
-
-/** Everything the display settings panel needs to explain what is going on. */
-function displayInfo() {
-  const cv = renderer.domElement;
-  return {
-    viewport: [window.innerWidth, window.innerHeight],
-    appBox: (() => {
-      const host = renderer.domElement.parentElement;
-      const b = host ? host.getBoundingClientRect() : null;
-      return b ? [Math.round(b.width), Math.round(b.height)] : [0, 0];
-    })(),
-    screen: [window.screen ? window.screen.width : 0, window.screen ? window.screen.height : 0],
-    dpr: window.devicePixelRatio || 1,
-    buffer: [cv.width, cv.height],
-    cssSize: [Math.round(cv.getBoundingClientRect().width), Math.round(cv.getBoundingClientRect().height)],
-    uiScale: lastUiScale,
-    autoScale: lastAutoScale,
-  };
-}
-
-
-addEventListener('resize', resize);
-addEventListener('orientationchange', () => setTimeout(resize, 60));
-if (window.visualViewport) {
-  visualViewport.addEventListener('resize', resize);
-  visualViewport.addEventListener('scroll', resize);
-}
-// fullscreen animates on macOS, so re-fit once it has settled
-for (const ev of ['fullscreenchange', 'webkitfullscreenchange']) {
-  document.addEventListener(ev, () => {
-    resize();
-    setTimeout(resize, 80);
-    setTimeout(resize, 320);
-  });
-}
-if (window.ResizeObserver) {
-  new ResizeObserver(resize).observe(document.documentElement);
-}
-addEventListener('load', resize);
-resize();
 
 /* ============================================================
    FLOAT TEXT PROJECTION

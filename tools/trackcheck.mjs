@@ -6,7 +6,7 @@
    the track is actually completable. */
 
 import * as THREE from '../vendor/three.module.js';
-import { TRACK_DEFS, Track } from '../src/track.js';
+import { TRACK_DEFS, Track } from '../src/render/track.js';
 import { CarState, stepCar, TUNE } from '../src/physics/index.js';
 
 const dt = 1 / 120;

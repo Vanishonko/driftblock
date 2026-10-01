@@ -5,7 +5,7 @@
    curbs, barriers, scenery, sky and lighting.
    ============================================================ */
 
-import * as THREE from '../vendor/three.module.js';
+import * as THREE from '../../vendor/three.module.js';
 
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 
