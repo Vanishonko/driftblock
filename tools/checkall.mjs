@@ -11,6 +11,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SUITES = [
   ['settings', 'settingscheck.mjs', false],
   ['boot', 'bootcheck.mjs', true],
+  ['specs', 'speccheck.mjs', false],
   ['physics', 'revcheck.mjs', false],
   ['wheel/ffb', 'ffbcheck.mjs', false],
   ['tracks', 'trackcheck.mjs', false],

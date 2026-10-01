@@ -598,3 +598,9 @@ html, body {
   font: 500 11px/1.5 ui-monospace, Menlo, monospace;
   color: var(--dim, #8b93a7); opacity: .85;
 }
+
+/* ---- spec cards in the pause menu: same cards, tighter ---- */
+.card.compact { padding: 8px 11px; }
+.card.compact h3 { font-size: 12px; margin: 0 0 3px; }
+.card.compact .desc { font-size: 10px; line-height: 1.4; }
+#pauseSpecCards { margin-bottom: 4px; }

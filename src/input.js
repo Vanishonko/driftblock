@@ -269,6 +269,12 @@ export class Input {
 
     this.state.fullscreenToggle = this.pressedThisFrame.has('KeyF');
 
+    // 1-4 switch car spec live, without pausing
+    this.state.specPick = -1;
+    for (let i = 1; i <= 4; i++) {
+      if (this.pressedThisFrame.has('Digit' + i)) this.state.specPick = i - 1;
+    }
+
     this.state.reset = this.pressedThisFrame.has('KeyR') || wheelReset;
     this.state.camToggle = this.pressedThisFrame.has('KeyC') || wheelCam;
     this.state.pause = this.pressedThisFrame.has('Escape') || this.pressedThisFrame.has('KeyP');

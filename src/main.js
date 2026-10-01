@@ -13,46 +13,10 @@ import { HUD } from './hud.js';
 import { Game, MODES, fmtTime, SCORE } from './game.js';
 import { TUNE, clamp, invalidateTopSpeed } from './physics.js';
 import { load as loadSettings, patch as patchSettings, flush as flushSettings } from './core/settings.js';
+import { SPECS, applySpec } from './physics/specs.js';
 import { WheelInput, defaultCalibration } from './wheel.js';
 import { ForceFeedback } from './ffb.js';
 import { WheelUI } from './wheelui.js';
-
-/* ============================================================
-   TUNING PRESETS
-   ============================================================ */
-const BASE_TUNE = JSON.parse(JSON.stringify(TUNE));
-
-const TUNES = [
-  {
-    id: 'balanced', name: 'BALANCED', desc: 'The default. Predictable on entry, forgiving on exit.',
-    mods: {},
-  },
-  {
-    id: 'drift', name: 'DRIFT SPEC', desc: 'Loose rear, faster steering, more yaw. Slides start instantly and hold forever.',
-    mods: { gripNormal: 0.82, gripPower: 0.86, gripHandbrake: 0.88, maxYawRate: 1.10, alignK: 0.82, engineAccel: 0.96 },
-  },
-  {
-    id: 'grip', name: 'GRIP SPEC', desc: 'More mechanical grip and a higher redline. Quicker lap times, harder to break traction.',
-    mods: { gripNormal: 1.16, gripPower: 1.10, gripHandbrake: 1.14, topSpeed: 1.06, engineAccel: 1.06, maxYawRate: 0.94 },
-  },
-  {
-    id: 'monster', name: 'MONSTER', desc: 'Absurd power, absurd top end, absurd consequences. Good luck.',
-    mods: { engineAccel: 1.34, topSpeed: 1.14, gripNormal: 0.88, gripPower: 0.92, maxYawRate: 1.06, brakeAccel: 1.08 },
-  },
-];
-
-function applyTune(id) {
-  const t = TUNES.find((x) => x.id === id) || TUNES[0];
-  for (const k of Object.keys(TUNE)) {
-    if (typeof BASE_TUNE[k] === 'number') TUNE[k] = BASE_TUNE[k];
-  }
-  for (const [k, mul] of Object.entries(t.mods)) {
-    if (typeof TUNE[k] === 'number') TUNE[k] = BASE_TUNE[k] * mul;
-  }
-  // the gearbox is scaled against the achievable top speed, which just moved
-  invalidateTopSpeed();
-  return t;
-}
 
 /* ============================================================
    SAVE
@@ -87,7 +51,7 @@ const wheel = new WheelInput();
 const ffb = new ForceFeedback();
 
 const save = loadSettings();
-applyTune(save.spec);
+applySpec(save.spec);
 
 if (save.wheel) wheel.setCalibration(save.wheel);
 wheel.enabled = true;
@@ -335,25 +299,56 @@ function buildGarage() {
 }
 
 /**
- * The spec cards. Shared by the garage and — from the pause menu — by the
- * in-run picker, so a spec change mid-session uses exactly the same UI.
+ * Change the car spec. Safe to call mid-run: the spec only moves grip, yaw,
+ * engine and brake values, none of which the car's mesh depends on, so the
+ * car keeps its geometry, position and speed.
+ *
+ * The one piece of bookkeeping needed is the gearbox. A spec can change the
+ * achievable top speed, which rescales every gear's redline speed, so the
+ * selected gear may no longer exist or may now be out of range for the
+ * current speed.
+ *
+ * @param {string} id
+ */
+function changeSpec(id) {
+  const spec = applySpec(id);
+  patchSettings({ spec: id });
+
+  if (game && game.car) {
+    const maxGear = TUNE.gearRatios.length;
+    if (game.car.playerGear > maxGear) game.car.playerGear = maxGear;
+    if (game.car.playerGear < -1) game.car.playerGear = -1;
+    if (game.car.gear > maxGear) game.car.gear = maxGear;
+  }
+
+  hud.toast('SPEC: ' + spec.name, 1.4);
+  audio.ui('ok');
+  return spec;
+}
+
+/** Refresh every visible spec picker after a change. */
+function rebuildSpecPickers() {
+  buildSpecCards(document.getElementById('tuneCards'));
+  buildSpecCards(document.getElementById('pauseSpecCards'), { compact: true });
+}
+
+/**
+ * The spec cards. Shared by the garage and the in-run pause picker, so a spec
+ * change uses exactly the same UI in both places.
  * @param {HTMLElement} host
  * @param {{onPick?: () => void}} [opts]
  */
 function buildSpecCards(host, opts = {}) {
   if (!host) return;
   host.innerHTML = '';
-  for (const t of TUNES) {
+  for (const t of SPECS) {
     const el = document.createElement('button');
-    el.className = 'card' + (t.id === save.spec ? ' sel' : '');
+    el.className = 'card' + (t.id === save.spec ? ' sel' : '') + (opts.compact ? ' compact' : '');
     el.innerHTML = `<h3>${t.name}</h3><div class="desc">${t.desc}</div>`;
     el.onclick = () => {
-      patchSettings({ spec: t.id });
-      applyTune(t.id);
-      audio.ui('ok');
-      hud.toast('SPEC: ' + t.name);
+      changeSpec(t.id);
+      rebuildSpecPickers();
       if (opts.onPick) opts.onPick();
-      else buildGarage();
     };
     el.onmouseenter = () => audio.ui('move');
     host.appendChild(el);
@@ -500,13 +495,13 @@ function buildOptions() {
 
   const th = document.getElementById('tuneCards');
   th.innerHTML = '';
-  for (const t of TUNES) {
+  for (const t of SPECS) {
     const el = document.createElement('button');
     el.className = 'card' + (t.id === save.spec ? ' sel' : '');
     el.innerHTML = `<h3>${t.name}</h3><div class="desc">${t.desc}</div>`;
     el.onclick = () => {
       patchSettings({ spec: t.id });
-      applyTune(t.id);
+      applySpec(t.id);
       buildGarage();
       audio.ui('ok');
       hud.toast('TUNE: ' + t.name);
@@ -889,6 +884,12 @@ function frameBody(now) {
 
   if (input.state.fullscreenToggle) toggleFullscreen();
 
+  // 1-4 change spec on the fly, mid-corner, without pausing
+  if (input.state.specPick >= 0 && game && game.state !== 'idle') {
+    const spec = SPECS[input.state.specPick];
+    if (spec && spec.id !== save.spec) changeSpec(spec.id);
+  }
+
   if (input.state.pause) {
     const inSubScreen = overlay && !overlay.classList.contains('hidden') && currentScreen !== 'pause';
     if (game && game.state === 'paused' && inSubScreen) {
@@ -899,6 +900,7 @@ function frameBody(now) {
     } else if (game && game.state === 'running') {
       game.state = 'paused';
       navStack.length = 0;
+      buildSpecCards(document.getElementById('pauseSpecCards'), { compact: true });
       showScreen('pause');
       audio.suspend();
     } else if (game && game.state === 'paused') {
