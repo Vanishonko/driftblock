@@ -183,6 +183,27 @@ The result: a donut settles at ~39 deg, and unwinding into countersteer on the
 throttle holds ~46 deg instead of snapping to zero in half a second. The grip
 line is untouched — gentle steering at full throttle still grips at 136 km/h.
 
+### The gearbox
+
+Manual gears run **-1 = reverse, 0 = neutral, 1-6**. Neutral genuinely
+disconnects the drivetrain, so you can sit and rev or blip the throttle
+mid-corner with no drive to the wheels. Paddles walk down through it: 3, 2, 1,
+N, R. The H-pattern learns a neutral gate as well as the six gears and reverse.
+
+### Burnouts
+
+Two kinds, and they are the same mechanism seen from different speeds:
+
+- **Standstill.** Brake plus throttle overwhelms the rear brakes and the tyres
+  spin against them. The car stays put, the engine screams off the limiter, and
+  lit tyres are their own smoke and skid-mark source.
+- **Rolling.** The same input on the move. Standing on the brake with the
+  throttle down overwhelms the *rear* brakes long before the fronts give up, so
+  the car keeps rolling while the rears stay lit. Braking force is shared mostly
+  to the front to model that, which is why the car slows but does not stop.
+
+A brake applied on its own still stops the car normally.
+
 ### Reverse
 
 Reverse is a **gear**, not a pedal. Braking never selects it: hold the brake for

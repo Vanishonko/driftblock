@@ -47,7 +47,9 @@ listenWithFallback(server, START_PORT, 20, (port) => {
   console.log('  Controls:  W/S throttle & brake  ·  A/D steer');
   console.log('             SPACE handbrake  ·  SHIFT mini-turbo');
   console.log('             R reset  ·  C camera  ·  ESC pause\n');
-  console.log('  Racing wheel: run tools/ffb/bridge.mjs instead for force feedback.\n');
+  console.log('  Racing wheel / force feedback: this server has NO bridge in it.');
+  console.log('  Run this instead:  node tools/ffb/bridge.mjs --iface=input');
+  console.log('  (the in-game TRY TO CONNECT button will always fail here)\n');
   console.log('  Press Ctrl+C to stop.\n');
   if (!NO_OPEN) openBrowser(url);
 });

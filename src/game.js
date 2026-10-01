@@ -408,14 +408,14 @@ export class Game {
 
     // An H-pattern shifter names a gear directly; paddles step by one.
     const req = input.gearRequest | 0;
-    if (req === 7) {
-      s.playerGear = 0;                      // H-pattern reverse gate
-    } else if (req > 0 && req <= maxGear) {
-      s.playerGear = req;
-    } else {
+    // H-pattern gates: 1..6 are gears, 7 is reverse, 8 is neutral.
+    if (req === 7) s.playerGear = -1;
+    else if (req === 8) s.playerGear = 0;
+    else if (req > 0 && req <= maxGear) s.playerGear = req;
+    else {
+      // Paddles walk down through neutral into reverse: 3, 2, 1, N, R.
       if (input.shiftUp) s.playerGear = Math.min(maxGear, s.playerGear + 1);
-      // shifting down past 1st selects reverse
-      if (input.shiftDown) s.playerGear = Math.max(0, s.playerGear - 1);
+      if (input.shiftDown) s.playerGear = Math.max(-1, s.playerGear - 1);
     }
 
     if (s.playerGear === prev) return;

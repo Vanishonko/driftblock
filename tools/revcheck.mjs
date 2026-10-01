@@ -217,12 +217,12 @@ console.log('\nDRIVETRAIN BEHAVIOUR');
 
   // -- reverse is a gear: select it in manual and use the throttle
   const rev = new CarState();
-  rev.manual = true; rev.playerGear = 0;
+  rev.manual = true; rev.playerGear = -1;      // -1 is reverse, 0 is neutral
   hold(rev, 2.0, inp({ throttle: 1, manual: true }));
   check('reverse gear drives the car backwards', rev.vf < -1.0,
     `${(rev.vf).toFixed(2)} m/s on throttle in R`);
   check('and the brake stops it', (() => {
-    const b = new CarState(); b.manual = true; b.playerGear = 0;
+    const b = new CarState(); b.manual = true; b.playerGear = -1;
     hold(b, 1.5, inp({ throttle: 1, manual: true }));
     const moving = b.vf;
     hold(b, 0.6, inp({ throttle: 1, brake: 1, manual: true }));
@@ -262,6 +262,46 @@ console.log('\nDRIVETRAIN BEHAVIOUR');
     `${lim.rpm.toFixed(0)} rpm`);
   check('and the limiter cuts drive rather than being cosmetic', lim.limiterCut > 0 || lim.rpm < TUNE.redlineRpm,
     `limiterCut ${lim.limiterCut.toFixed(2)}`);
+}
+
+// ---- 9. neutral gear and rolling burnouts ----
+console.log('\nNEUTRAL + ROLLING BURNOUTS');
+{
+  const hold = (s, sec, input) => { for (let i = 0; i < Math.round(sec / dt); i++) stepCar(s, input, dt, ROAD); };
+
+  // -- neutral: engine free, car goes nowhere
+  const n = new CarState();
+  n.manual = true; n.playerGear = 0;
+  hold(n, 2.0, inp({ throttle: 1, manual: true }));
+  check('neutral lets the engine rev without driving', n.rpm > 6000 && n.speed < 0.5,
+    `${n.rpm.toFixed(0)} rpm, car at ${(n.speed * 3.6).toFixed(1)} km/h`);
+  check('and the gear reads neutral', (n.gear | 0) === 0, `gear ${n.gear}`);
+
+  // -- a blip in neutral should be audible, i.e. the revs actually move
+  const blip = new CarState();
+  blip.manual = true; blip.playerGear = 0;
+  hold(blip, 0.3, inp({ throttle: 1, manual: true }));
+  const peak = blip.rpm;
+  hold(blip, 1.5, inp({ manual: true }));
+  check('lifting in neutral lets the revs fall back', blip.rpm < peak - 1500,
+    `${peak.toFixed(0)} -> ${blip.rpm.toFixed(0)} rpm`);
+
+  // -- rolling burnout: brake + throttle keeps the rears lit while moving
+  const roll = new CarState();
+  hold(roll, 3.2, inp({ throttle: 1 }));       // ~70 km/h: where you'd actually do this
+  const v0 = roll.speed;
+  hold(roll, 2.0, inp({ throttle: 1, brake: 1 }));
+  check('brake + throttle lights the rears while rolling', roll.wheelspin > 0.5,
+    `wheelspin ${roll.wheelspin.toFixed(2)} at ${(roll.speed * 3.6).toFixed(0)} km/h`);
+  check('and does not simply stop the car', roll.speed > v0 * 0.4,
+    `${(v0 * 3.6).toFixed(0)} -> ${(roll.speed * 3.6).toFixed(0)} km/h`);
+
+  // -- but a plain brake still stops it properly
+  const stop = new CarState();
+  hold(stop, 6.0, inp({ throttle: 1 }));
+  hold(stop, 4.0, inp({ brake: 1 }));
+  check('the brake on its own still stops the car', stop.speed < 1.5,
+    `${(stop.speed * 3.6).toFixed(1)} km/h after 4 s of braking`);
 }
 
 console.log(fail===0 ? '\nRev model behaves like an engine.\n' : `\n${fail} FAILED\n`);

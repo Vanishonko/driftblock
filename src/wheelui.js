@@ -286,10 +286,23 @@ export class WheelUI {
     b.appendChild(el('div', 'bridge-state ' + cls,
       state === 'on'
         ? `CONNECTED${br.wheelName ? ' — ' + br.wheelName : ''}`
-        : state === 'connecting' ? 'CONNECTING…' : 'NOT RUNNING'));
+        : state === 'connecting' ? 'CONNECTING…'
+          : `NOT RUNNING — tried ws://127.0.0.1:${location.port || 8177}/ffb`));
     b.appendChild(el('p', 'wheel-hint',
       'A browser cannot turn a wheel. Real force feedback needs the optional native bridge: ' +
-      'quit this, run <code>node tools/ffb/bridge.mjs</code>, then open the address it prints.'));
+      'quit this, run <code>node tools/ffb/bridge.mjs --iface=input</code>, then open the ' +
+      'address it prints — <b>not</b> the plain dev server, which has no bridge in it.'));
+
+    // Say WHY it failed. "Could not reach the bridge" is useless when the
+    // usual cause is that you are on the plain dev server, which serves the
+    // game but has no force-feedback endpoint at all.
+    if (state === 'failed' || (state === 'off' && br.lastError)) {
+      b.appendChild(el('p', 'wheel-hint bad',
+        'No force feedback available on this address. Either the bridge is not running, ' +
+        'or you are on the plain dev server (<code>tools/serve.mjs</code>) — that one has ' +
+        'no bridge in it. Check the terminal: the bridge prints the address to use, and ' +
+        'it may not be 8177 if that port was already taken.'));
+    }
 
     const btn = el('button', 'btn', state === 'on' ? 'DISCONNECT' : 'TRY TO CONNECT');
     btn.onclick = () => {

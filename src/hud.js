@@ -279,9 +279,11 @@ export class HUD {
     c.fillText('KM/H', cx, cy + 40);
 
     // ---- gear
-    c.fillStyle = d.reversing ? '#ffcc33' : '#2fe0ff';
+    const g = d.gear | 0;
+    const label = g < 0 ? 'R' : g === 0 ? 'N' : String(g || 1);
+    c.fillStyle = g <= 0 ? '#ffcc33' : '#2fe0ff';
     c.font = '900 56px ui-monospace, Menlo, monospace';
-    c.fillText(d.reversing ? 'R' : String(d.gear || 1), cx, cy + 112);
+    c.fillText(label, cx, cy + 112);
     c.fillStyle = 'rgba(160,170,200,0.75)';
     c.font = '700 15px ui-monospace, Menlo, monospace';
     c.fillText('GEAR', cx, cy + 148);

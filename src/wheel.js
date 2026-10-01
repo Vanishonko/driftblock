@@ -470,7 +470,7 @@ export const LEARN_STEPS = [
 
 /** Extra steps that only run when the driver asks to learn an H-pattern. */
 export const SHIFTER_STEPS = [
-  { id: 'shiftNeutral', title: 'Leave it in neutral', detail: 'Let the shifter sit in neutral and hold still.', seconds: 2.0 },
+  { id: 'shiftNeutral', title: 'Leave it in neutral', detail: 'Let the shifter sit in neutral and hold still. This teaches the game your neutral gate.', seconds: 2.4 },
   { id: 'shift1', title: 'Select 1st', detail: 'Slot the shifter into 1st and hold it there.', seconds: 2.6 },
   { id: 'shift2', title: 'Select 2nd', detail: 'Now 2nd.', seconds: 2.6 },
   { id: 'shift3', title: 'Select 3rd', detail: 'Now 3rd.', seconds: 2.6 },

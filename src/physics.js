@@ -35,6 +35,7 @@ export const TUNE = {
   wheelspinFall: 2.6,
   burnoutBrake: 0.30,    // brake held past this + throttle = standstill burnout
   burnoutSpeed: 6.0,
+  rollingBurnoutSpeed: 34,  // a brake stand keeps the rears lit up to here
   reverseAccel: 4.5,
   maxReverse: 13,
   reverseHoldTime: 1.20,   // brake held this long while stopped selects reverse
@@ -196,23 +197,59 @@ export class CarState {
 export function updateDrivetrain(s, input, h) {
   const T = TUNE;
 
+  const throttle = clamp(input.throttle, 0, 1);
+  const idleR = T.idleRpm, redR = T.redlineRpm;
+
   // ---- gear selection
+  // playerGear / gear convention:  -1 = reverse, 0 = neutral, 1..6 = gears.
   const nGears = T.gearRatios.length;
   let g = clamp((s.gear | 0) - 1, 0, nGears - 1);
   if (s.manual) {
     // The driver is in charge. Nothing shifts on its own — that is the whole
     // point of having a shifter, and it lets you hold a gear through a corner
-    // instead of the box deciding for you. Gear 0 is reverse.
-    if ((s.playerGear | 0) === 0) {
-      s.rpm01 = clamp(s.rpm01, 0, 1);
+    // instead of the box deciding for you.
+    const pg = s.playerGear | 0;
+
+    if (pg === 0) {
+      // NEUTRAL. The drivetrain is open, so the engine is connected to
+      // nothing: it answers the throttle and the car just rolls. This is
+      // what lets you blip the throttle mid-corner or sit and rev.
       s.gear = 0;
       s.gearT = 0;
+      s.clutchEngaged = 0;
+      s.wheelspin = Math.max(0, s.wheelspin - h * 3);
+      s.clutchKick = Math.max(0, s.clutchKick - h);
+      s._prevThrottle = throttle;
+      const tgt = idleR + throttle * (redR - idleR);
+      s.rpm += (tgt - s.rpm) * (1 - Math.exp(-(throttle > 0.1 ? T.revUpRate : T.revDownRate) * h));
+      s.rpm = clamp(s.rpm, idleR, redR);
+      s.rpm01 = clamp((s.rpm - idleR) / (redR - idleR), 0, 1);
+      s.limiter = s.rpm >= redR - 60;
+      s.limiterCut = s.limiter ? 1 : Math.max(0, s.limiterCut - h * 6);
+      if (throttle < 0.08 && s._prevThrottle > 0.35 && s.rpm01 > 0.42) s.overrun = 0.34;
+      s.overrun = Math.max(0, s.overrun - h);
+      return s;
+    }
+
+    if (pg < 0) {
+      // REVERSE. A short ratio, driven off the throttle like any other gear.
+      s.gear = -1;
+      s.gearT = clamp(Math.abs(s.speed) / Math.max(1e-3, gearMaxSpeed(0) * 0.5), 0, 1);
       s.clutchEngaged = 1 - clamp(((input.clutch || 0) - T.clutchEngageLo)
         / (T.clutchEngageHi - T.clutchEngageLo), 0, 1);
       s.wheelspin = Math.max(0, s.wheelspin - h * 3);
+      s.clutchKick = Math.max(0, s.clutchKick - h);
+      const tgt = idleR + s.gearT * (redR - idleR) * 0.45;
+      s.rpm += (tgt - s.rpm) * (1 - Math.exp(-T.revUpRate * h));
+      s.rpm = clamp(s.rpm, idleR, redR);
+      s.rpm01 = clamp((s.rpm - idleR) / (redR - idleR), 0, 1);
+      s.limiter = s.rpm >= redR - 60;
+      s.limiterCut = s.limiter ? 1 : Math.max(0, s.limiterCut - h * 6);
+      s._prevThrottle = throttle;
       return s;
     }
-    g = clamp((s.playerGear | 0) - 1, 0, nGears - 1);
+
+    g = clamp(pg - 1, 0, nGears - 1);
   } else {
     while (g < nGears - 1 && Math.abs(s.speed) > gearMaxSpeed(g) * 0.985) g++;
     while (g > 0 && Math.abs(s.speed) < gearMaxSpeed(g - 1) * 0.86) g--;
@@ -224,8 +261,6 @@ export function updateDrivetrain(s, input, h) {
   const gm = gearMaxSpeed(g);
   const gearT = clamp(Math.abs(s.speed) / Math.max(1e-3, gm), 0, 1.25);
   const wheelRpm = idle + clamp(gearT, 0, 1) * (red - idle);
-
-  const throttle = clamp(input.throttle, 0, 1);
 
   // How locked-up is the drivetrain? Only a slipping clutch lets the engine
   // outrun the wheels, and that is a low-speed effect: by ~6 m/s the
@@ -441,7 +476,7 @@ export function stepCar(s, input, dt, surf) {
   // The gear ratio is the whole reason a short gear pulls and a tall one
   // bogs — without it every gear accelerated identically.
   let demanded = 0;
-  if (input.throttle > 0.01 && s.gear === 0) {
+  if (input.throttle > 0.01 && s.gear === -1) {
     // reverse gear: the throttle drives the car backwards
     accel -= clamp(input.throttle, 0, 1) * T.reverseAccel
       * (1 - clamp(-vf / T.maxReverse, 0, 1));
@@ -466,13 +501,22 @@ export function stepCar(s, input, dt, surf) {
   const gripAvail = T.tractionLimit * surf.grip
     * (1 - 0.25 * clamp(Math.abs(s.absSlip) / 1.0, 0, 1));
 
+  // A brake stand. Standing on the brake with the throttle down overwhelms
+  // the REAR brakes long before the fronts give up, so the car keeps rolling
+  // while the rear tyres spin — a rolling burnout rather than a stop. The
+  // braking force is shared mostly to the front to model that.
+  const brakeStand = input.brake > T.burnoutBrake && input.throttle > 0.3;
+  const brakeShare = brakeStand ? 0.26 : 1;
+
   let spinTarget = 0;
   if (demanded > gripAvail) {
     spinTarget = clamp((demanded - gripAvail) / Math.max(1, gripAvail), 0, 1);
   }
-  // Brake on, throttle on, going nowhere: the classic standstill burnout.
-  if (input.brake > T.burnoutBrake && input.throttle > 0.3 && Math.abs(vf) < T.burnoutSpeed) {
-    spinTarget = 1;
+  if (brakeStand) {
+    // full wheelspin when stationary, easing off as speed builds, but never
+    // dropping away to nothing — this is the whole point of the move
+    const rolling = 1 - clamp(Math.abs(vf) / T.rollingBurnoutSpeed, 0, 1);
+    spinTarget = Math.max(spinTarget, 0.45 + rolling * 0.55);
   }
   const spinRate = spinTarget > s.wheelspin ? T.wheelspinRise : T.wheelspinFall;
   s.wheelspin += (spinTarget - s.wheelspin) * (1 - Math.exp(-spinRate * h));
@@ -488,8 +532,8 @@ export function stepCar(s, input, dt, surf) {
   // reverse. Reverse is a gear: select it in manual (shift down past 1st,
   // or the R gate on an H-pattern). Auto has no reverse — use reset.
   if (input.brake > 0.01) {
-    if (vf > 0.4) accel -= input.brake * T.brakeAccel;
-    else if (s.gear === 0 && vf < -0.4) accel += input.brake * T.brakeAccel;
+    if (vf > 0.4) accel -= input.brake * T.brakeAccel * brakeShare;
+    else if (s.gear === -1 && vf < -0.4) accel += input.brake * T.brakeAccel;
     // otherwise the brakes simply hold the car
   }
 
