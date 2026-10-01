@@ -40,6 +40,7 @@ const TEST = argv.includes('--test');
 // reading the wheel at all. Opt in with --iface=input.
 const IFACE = (argv.find((a) => a.startsWith('--iface=')) || '--iface=vendor').split('=')[1];
 const RELEASE = argv.includes('--release');
+const WATCH = argv.includes('--watch');
 // Off by default: these writes are what break the wheel's mode switch.
 const ALLOW_INIT = argv.includes('--allow-init');
 const portArg = argv.find((a) => /^\d+$/.test(a));
@@ -171,6 +172,52 @@ async function selfTest() {
 }
 
 if (PROBE) process.exit(probe());
+/**
+ * --watch: print the raw HID input report so we can see which bytes carry the
+ * wheel and pedals on THIS unit.
+ *
+ * Chrome will not expose a gamepad to a page until the driver physically
+ * touches it, and some wheels never appear at all. Reading the report here
+ * sidesteps that entirely: the bridge owns the device and can forward the
+ * values over the websocket, so the game stops depending on the Gamepad API.
+ * To do that we need the byte layout for this exact wheel, which is what this
+ * prints. Turn the wheel slowly lock to lock, then press each pedal.
+ */
+async function watchReports() {
+  const HID = loadHid();
+  if (!HID) { console.log('\n  node-hid is not installed.\n'); return 1; }
+
+  const all = findWheelInterfaces();
+  const input = all.find((d) => d.usagePage === 0x0001 || d.interface === 0);
+  if (!input) { console.log('\n  No joystick interface found.\n'); return 1; }
+
+  const dev = new HID.HID(input.path);
+  console.log(`\n  Reading ${PRODUCTS[input.productId] || 'wheel'} — turn the wheel slowly`);
+  console.log('  lock to lock, then press the throttle, brake and clutch in turn.');
+  console.log('  Ctrl+C when done.\n');
+  console.log('  Only bytes that CHANGE are shown, so the quiet ones are not noise.\n');
+
+  let prev = null;
+  let n = 0;
+  dev.on('data', (buf) => {
+    if (!prev) { prev = Buffer.from(buf); console.log('  first report, ' + buf.length + ' bytes'); return; }
+    const moves = [];
+    for (let i = 0; i < buf.length; i++) if (buf[i] !== prev[i]) moves.push(`${i}:${prev[i]}->${buf[i]}`);
+    prev = Buffer.from(buf);
+    if (!moves.length) return;
+    if (++n > 60) return;
+    console.log('  ' + moves.join('  '));
+  });
+
+  process.on('SIGINT', () => {
+    try { dev.close(); } catch { /* gone */ }
+    console.log('\n  done — send those lines over.\n');
+    process.exit(0);
+  });
+  return new Promise(() => {});
+}
+
+if (WATCH) watchReports().then((c) => process.exit(c));
 if (RELEASE) releaseWheel().then((c) => process.exit(c));
 if (TEST) selfTest().then((c) => process.exit(c));
 

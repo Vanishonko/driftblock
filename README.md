@@ -215,6 +215,31 @@ GARAGE ▸ AUDIO ▸ **MINI-TURBO**:
 The automatic release happens at exactly the moment you are trying to settle
 the car, which is not always what you want, hence the switch.
 
+### "It says my wheel isn't connected"
+
+Chrome and Safari **hide a gamepad from a page until you physically touch it**
+— turn the wheel, press a pedal, press any button. This is a deliberate privacy
+measure, and it means a wheel that is plugged in, powered, enumerated by macOS
+and working perfectly is still invisible to the game.
+
+The test that proves it: with nothing else holding the device and the page
+already user-activated, `navigator.getGamepads()` returns zero pads.
+
+So if the game says it cannot see your wheel, **turn the wheel a little**. It
+will appear on its own; nothing needs replugging, and the bridge is not
+involved. The setup panel says this rather than leaving you guessing.
+
+If it never appears even after you touch it, run:
+
+```bash
+node tools/ffb/bridge.mjs --watch
+```
+
+That prints the raw HID report bytes as they change. Turn the wheel and press
+each pedal, and the byte offsets it prints are enough to have the bridge read
+the wheel itself and forward the values over the websocket — removing the
+Gamepad API from the picture entirely.
+
 ### Fullscreen
 
 The game goes fullscreen when you hit START ENGINE — that click is a user

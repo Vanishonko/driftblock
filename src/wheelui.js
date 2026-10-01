@@ -288,6 +288,16 @@ export class WheelUI {
         ? `CONNECTED${br.wheelName ? ' — ' + br.wheelName : ''}`
         : state === 'connecting' ? 'CONNECTING…'
           : `NOT RUNNING — tried ws://127.0.0.1:${location.port || 8177}/ffb`));
+    // The single most common false alarm: the wheel is fine, the browser
+    // just has not been told about it yet.
+    if (!br.wheelSeen) {
+      b.appendChild(el('p', 'wheel-hint bad',
+        'NO WHEEL VISIBLE YET. Chrome keeps a wheel hidden from the page until '
+        + 'you physically touch it \u2014 turn the wheel a little, or press a pedal or '
+        + 'any button on it. It will appear on its own the moment you do. '
+        + 'Nothing needs replugging.'));
+    }
+
     b.appendChild(el('p', 'wheel-hint',
       'A browser cannot turn a wheel. Real force feedback needs the optional native bridge: ' +
       'quit this, run <code>node tools/ffb/bridge.mjs --iface=input</code>, then open the ' +

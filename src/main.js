@@ -102,6 +102,12 @@ wheel.enabled = true;
 input.attachWheel(wheel, ffb);
 ffb.setConfig(wheel.cal);
 
+// Chrome hides a gamepad until the driver physically touches it. React the
+// instant it appears so the setup panel stops saying "no wheel".
+wheel.watch(() => {
+  if (wheelUI && wheelUI.refreshControls) wheelUI.refreshControls();
+});
+
 const wheelUI = new WheelUI(wheel, ffb, save, () => {
   writeSave(save);
   ffb.setConfig(wheel.cal);
@@ -539,7 +545,10 @@ overlay.addEventListener('click', (e) => {
   const btn = e.target.closest('[data-action]');
   if (!btn) return;
   const a = btn.dataset.action;
-  audio.init();
+  // audio.init() creates an AudioContext, which a browser can refuse. If it
+  // throws here it would take the whole menu action with it: the button would
+  // appear to do nothing at all. Sound is never worth losing the game over.
+  try { audio.init(); } catch (err) { console.error('[DRIFTBLOCK] audio init failed:', err); }
 
   switch (a) {
     case 'start':

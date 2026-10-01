@@ -42,6 +42,7 @@ export class Input {
    * view/reset/pause keys.
    */
   attachWheel(wheel, ffb) {
+    if (ffb) ffb.input = this;
     this.wheel = wheel;
     this.ffb = ffb;
   }

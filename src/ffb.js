@@ -325,6 +325,14 @@ export class ForceFeedback {
   }
 
   /** Human-readable summary for the setup screen. */
+  /**
+   * Has the browser handed us a wheel this session? It has not, the wheel is
+   * simply invisible to the page until the driver physically touches it.
+   */
+  get wheelSeen() {
+    return !!(this.input && this.input.wheel && this.input.wheel.connected);
+  }
+
   describe() {
     if (this.supported === 'torque') {
       return { label: 'FORCE FEEDBACK ACTIVE', detail: this.deviceName || 'native wheel', level: 'good' };
