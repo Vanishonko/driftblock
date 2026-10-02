@@ -17,6 +17,8 @@ let root = null;
 let deps = null;
 let timer = null;
 let visible = false;
+// every distinct reading the gamepad has produced since the page loaded
+const seen = { sig: null };
 
 /** One line per link in the chain, each independently checkable. */
 function collect() {
@@ -29,11 +31,32 @@ function collect() {
   let pressed = 0;
   if (pads[0]) for (const b of pads[0].buttons) if (b.pressed) pressed++;
 
+  // A wheel can be LISTED and completely silent. Chrome enumerates the
+  // device, so it shows up and every link reads green, while not a single
+  // input report arrives — no steering, no pedals, and force feedback that
+  // is accepted and does nothing. That combination is indistinguishable
+  // from a working setup on any screen that only counts devices, and it
+  // sent someone hunting through the game for a fault that was in the wheel.
+  //
+  // So watch for movement, not presence. If nothing has changed since the
+  // page loaded, say so.
+  const sig = pads.length
+    ? [...pads[0].axes].map((v) => v.toFixed(2)).join(',') + '|'
+      + pads[0].buttons.map((b) => (b.pressed ? 1 : 0)).join('')
+    : '';
+  if (sig) {
+    if (!seen.sig) seen.sig = new Set();
+    seen.sig.add(sig);
+  }
+  const silent = pads.length > 0 && seen.sig && seen.sig.size <= 1;
+
   return {
     browser: {
       gamepads: pads.length,
       ids: pads.map((p) => p.id).slice(0, 2),
       buttonsDown: pressed,
+      silent,
+      distinctReadings: seen.sig ? seen.sig.size : 0,
       // Chrome hides a gamepad until the driver physically touches it
       note: pads.length === 0
         ? 'turn the wheel or press a pedal — browsers hide a pad until you touch it'
@@ -76,7 +99,7 @@ function render() {
   root.innerHTML = `
     <div class="ffbd-head">FORCE FEEDBACK CHAIN <em>Ctrl+D to close</em></div>
 
-    <div class="ffbd-sec ${browserOk ? 'ok' : 'bad'}">
+    <div class="ffbd-sec ${!browserOk ? 'bad' : c.browser.silent ? 'bad' : 'ok'}">
       <h4>1 · DOES THE BROWSER SEE A WHEEL?</h4>
       ${row('gamepads', c.browser.gamepads, browserOk ? 'ok' : 'bad')}
       ${c.browser.ids.map((id, i) => row('  id ' + i, id)).join('')}
@@ -91,6 +114,17 @@ function render() {
       ${row('using bridge input', c.game.usingBridgeInput ? 'yes' : 'no')}
       ${row('live axes', c.game.axes)}
     </div>
+
+    ${c.browser.silent ? `
+    <p class="ffbd-note">
+      <b>THE WHEEL IS LISTED BUT SILENT.</b> Chrome can see the device but not
+      one input report has arrived — ${c.browser.distinctReadings} distinct
+      reading(s) since the page loaded. That is why there is no steering, no
+      pedals, and no force: the wheel accepts commands and answers none of
+      them. Nothing in the game will fix this. Quit the bridge, pull the
+      wheel's POWER BRICK (not just the USB), wait ten seconds, then power it
+      and plug the USB back in.
+    </p>` : ''}
 
     <div class="ffbd-sec ${bridgeOk ? 'ok' : 'bad'}">
       <h4>3 · IS THE BRIDGE CONNECTED?</h4>
