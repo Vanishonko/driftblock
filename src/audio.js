@@ -101,13 +101,59 @@ export class GameAudio {
     this.engShelf.frequency.value = 3400;
     this.engShelf.gain.value = -9;
 
-    this.engGain.connect(this.engFilter);
+    // Two resonant peaks in the chain, which is what makes this sound like
+    // it is coming out of a pipe rather than out of an oscillator. A real
+    // exhaust and intake have strong resonances that move with revs; without
+    // them any amount of harmonic content still reads as a synth tone.
+    this.resA = ctx.createBiquadFilter();
+    this.resA.type = 'peaking';
+    this.resA.Q.value = 2.6;
+    this.resA.gain.value = 10;
+
+    this.resB = ctx.createBiquadFilter();
+    this.resB.type = 'peaking';
+    this.resB.Q.value = 1.7;
+    this.resB.gain.value = 7;
+
+    this.engGain.connect(this.resA);
+    this.resA.connect(this.resB);
+    this.resB.connect(this.engFilter);
     this.engFilter.connect(this.engShelf);
     this.engShelf.connect(this.master);
 
-    const mkOsc = (type, detune, gainVal, mult) => {
+    /**
+     * The shape of one cylinder's exhaust pulse.
+     *
+     * A sawtooth is the obvious thing to reach for and it is the wrong
+     * shape: all harmonics at exactly 1/n is bright and buzzy, which is the
+     * "microwave" end of the problem. Lifting the low orders and rolling the
+     * rest off gives a much fatter spectrum — 94% of the energy below the
+     * fifth harmonic against 88% for a saw — which is what puts a motorblock
+     * under the note instead of a whine.
+     *
+     * The phase scatter is cosmetic and worth being honest about: for a
+     * steady periodic tone the ear is largely phase-deaf, so it does not
+     * change the timbre. It only shapes the waveform. The fatness comes
+     * entirely from the amplitudes.
+     */
+    const enginePulse = (count = 40, rolloff = 1.05) => {
+      const real = new Float32Array(count);
+      const imag = new Float32Array(count);
+      const GOLDEN = 2.399963229728653;
+      for (let n = 1; n < count; n++) {
+        // slightly stronger low orders than a saw, so there is weight under it
+        const amp = (1 / Math.pow(n, rolloff)) * (n < 5 ? 1.35 : 1);
+        const phase = n * GOLDEN;
+        real[n] = amp * Math.cos(phase);
+        imag[n] = amp * Math.sin(phase);
+      }
+      return ctx.createPeriodicWave(real, imag, { disableNormalization: false });
+    };
+    this.pulseWave = enginePulse();
+
+    const mkOsc = (type, detune, gainVal, mult, wave) => {
       const o = ctx.createOscillator();
-      o.type = type;
+      if (wave) o.setPeriodicWave(wave); else o.type = type;
       o.detune.value = detune;
       const g = ctx.createGain();
       g.gain.value = gainVal;
@@ -117,13 +163,15 @@ export class GameAudio {
       return o;
     };
 
-    // Body first: a sine an octave below the firing frequency is what gives
-    // an engine its weight instead of a buzzy top end.
-    this.oscSub = mkOsc('sine', 0, 0.34, 0.5);
-    this.oscA = mkOsc('sawtooth', -5, 0.22, 1);
-    this.oscB = mkOsc('sawtooth', +9, 0.19, 1);
-    this.oscLump = mkOsc('square', 0, 0.06, 0.5);   // half-order lumpiness
-    this.oscBright = mkOsc('sawtooth', +16, 0.09, 2);
+    // Three copies of the same pulse. The detune is deliberately wide enough
+    // to beat at a few Hz rather than to sit in unison: real cylinders do not
+    // fire identically, and that slow unevenness is a big part of the
+    // character. Two of them an octave down carry the weight.
+    this.oscSub = mkOsc('sine', 0, 0.30, 0.5, this.pulseWave);
+    this.oscA = mkOsc('sawtooth', -14, 0.24, 1, this.pulseWave);
+    this.oscB = mkOsc('sawtooth', +21, 0.21, 1, this.pulseWave);
+    this.oscLump = mkOsc('square', 0, 0.05, 0.25);
+    this.oscBright = mkOsc('sawtooth', +16, 0.05, 2);
 
     // ---- intake / induction roar, tracks revs and throttle
     this.engNoise = ctx.createBufferSource();
@@ -264,6 +312,16 @@ export class GameAudio {
     this.engGain.gain.setTargetAtTime(vol, t, 0.035);
 
     this.engFilter.frequency.setTargetAtTime(280 + Math.pow(rpm01, 1.15) * 4200 + throttle * 500, t, sm);
+
+    // The pipe resonances move with revs. Low orders carry the note, higher
+    // ones carry the rasp, and keeping them locked to f0 is what stops the
+    // whole thing sounding like a fixed filter with a tone behind it.
+    this.resA.frequency.setTargetAtTime(Math.max(40, f0 * 1.9), t, sm);
+    this.resB.frequency.setTargetAtTime(Math.max(120, f0 * 5.6), t, sm);
+    // under load the pipe rings harder; off throttle it goes flat and hollow
+    this.resA.gain.setTargetAtTime(7 + throttle * 7, t, 0.09);
+    this.resB.gain.setTargetAtTime(4 + throttle * 6, t, 0.09);
+
     this.engNoiseFilter.frequency.setTargetAtTime(220 + f0 * 3.2, t, sm);
     this.engNoiseGain.gain.setTargetAtTime(
       p.engineOn ? (0.012 + rpm01 * 0.085) * (0.2 + throttle * 0.8) : 0, t, 0.05);
