@@ -123,6 +123,10 @@ export class WheelForce {
     const all = findWheelInterfaces();
     if (!all.length) { this.lastError = 'no Logitech wheel found on USB'; return false; }
 
+    // Remember what each candidate did, so a failure can say something
+    // useful instead of just "no wheel".
+    this.attempts = [];
+
     const isInput = (d) => d.usagePage === INPUT_USAGE_PAGE || d.interface === 0;
     const isVendor = (d) => d.usagePage === FORCE_USAGE_PAGE;
 
@@ -141,13 +145,39 @@ export class WheelForce {
         this.path = info.path;
         this.usagePage = info.usagePage;
         this.name = PRODUCTS[info.productId] || info.product || 'Logitech wheel';
+        const kind = isInput(info) ? 'input' : isVendor(info) ? 'vendor' : 'other';
+
+        // Enumerating is not evidence that it works.
+        //
+        // A G29 opens perfectly on its vendor interface and then rejects
+        // every single force report with IOHIDDeviceSetReport failed. The
+        // bridge looks connected, the status page says the wheel is there,
+        // the game sends a million force frames, and nothing moves — which
+        // is the hardest version of this to diagnose from the driver's seat.
+        //
+        // So write once, and believe the write rather than the enumeration.
+        if (!this._probeWrites()) {
+          this.attempts.push(`${kind}: opens but rejects force reports`);
+          if (this.verbose) {
+            console.log(`  ${kind} interface opens but rejects force reports — trying the next one`);
+          }
+          try { dev.close(); } catch { /* already gone */ }
+          this.device = null;
+          continue;
+        }
+
         if (this.verbose) {
-          const kind = isInput(info) ? 'input' : isVendor(info) ? 'vendor' : 'other';
-          console.log(`  opened ${this.name} on the ${kind} interface (usagePage 0x${(info.usagePage || 0).toString(16)})`);
+          console.log(`  opened ${this.name} on the ${kind} interface (usagePage 0x${(info.usagePage || 0).toString(16)}) — accepts force`);
         }
         return true;
       } catch (e) {
         this.lastError = e.message;
+        const kind = isInput(info) ? 'input' : isVendor(info) ? 'vendor' : 'other';
+        // "exclusive access" means something else already has this interface
+        // — usually the browser, or another copy of this bridge.
+        this.attempts.push(/exclusive/i.test(e.message)
+          ? `${kind}: held by another process`
+          : `${kind}: ${e.message}`);
       }
     }
     return false;
@@ -166,6 +196,20 @@ export class WheelForce {
     this._write([0xf8, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x00]);
     this._write([0xf8, 0x09, 0x05, 0x01, 0x01, 0x00, 0x00]);
     return true;
+  }
+
+  /**
+   * Ask the interface to do something real and see whether it agrees.
+   * A light rim friction: harmless if it lands, and the cache is cleared
+   * afterwards so the first genuine command is not skipped as a no-op.
+   * @returns {boolean}
+   */
+  _probeWrites() {
+    const before = this.writeErrors;
+    const ok = this._write([0x21, 0x02, 0x02, 0x00, 0x02, 0x00, 0x00]);
+    this._lastFriction = null;
+    this.failStreak = 0;
+    return ok && this.writeErrors === before;
   }
 
   _write(bytes) {

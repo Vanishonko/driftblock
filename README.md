@@ -230,6 +230,25 @@ GARAGE ▸ AUDIO ▸ **MINI-TURBO**:
 The automatic release happens at exactly the moment you are trying to settle
 the car, which is not always what you want, hence the switch.
 
+### Force feedback does nothing
+
+There are four links in the chain and they all fail identically from the
+driver's seat, so find out which one is broken before changing anything.
+Press **Ctrl+D** in the game, or read `/ffb-status` on the bridge's address.
+
+The one that catches people: **the G29 rejects every force report on its
+vendor interface.** It opens perfectly, enumerates fine, the status page reports
+the wheel as connected, the game sends a million force frames, and nothing
+moves. `IOHIDDeviceSetReport failed: (0xE0005000)` is what that looks like in
+the logs. The bridge now writes one probe report and believes the result rather
+than the enumeration, so it will not sit on an interface that does not work.
+
+The other one is ordering. **Start the bridge before opening the game page.**
+Interfaces are exclusive: whoever opens one first keeps it, and a browser tab
+that already holds the wheel will stop the bridge getting it. If the bridge
+reports `held by another process`, close the tab, restart the bridge, then open
+the address it prints.
+
 ### "It says my wheel isn't connected"
 
 Chrome and Safari **hide a gamepad from a page until you physically touch it**

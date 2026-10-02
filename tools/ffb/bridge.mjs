@@ -38,7 +38,17 @@ const TEST = argv.includes('--test');
 // SAFE default. See the header of g29.mjs: writing effect commands to the
 // input interface is what made FFB work, but it appears to stop the browser
 // reading the wheel at all. Opt in with --iface=input.
-const IFACE = (argv.find((a) => a.startsWith('--iface=')) || '--iface=vendor').split('=')[1];
+// Default 'auto': try the input interface first, fall back to vendor. A
+// mistyped value used to fall through to vendor in silence, and vendor is
+// the one a G29 rejects every write on — so a single missing letter looked
+// exactly like a broken wheel.
+const IFACE_ARG = argv.find((a) => a.startsWith('--iface='));
+const IFACE = IFACE_ARG ? IFACE_ARG.split('=')[1] : 'auto';
+if (!['auto', 'input', 'vendor'].includes(IFACE)) {
+  console.error(`\n  Unknown --iface value: "${IFACE}"`);
+  console.error('  Use --iface=input, --iface=vendor, or leave it off for auto.\n');
+  process.exit(2);
+}
 const RELEASE = argv.includes('--release');
 const WATCH = argv.includes('--watch');
 // Off by default: these writes are what break the wheel's mode switch.
@@ -98,13 +108,13 @@ function probe() {
 
   const hasInput = wheels.some((d) => d.usagePage === 0x0001);
   console.log('');
-  console.log(`  Force feedback will write to the ${IFACE} interface` +
-    (IFACE === 'vendor' ? ' (usagePage 0xff00).' : ' (usagePage 0x0001).'));
+  console.log(`  Force feedback interface: ${IFACE}` +
+    (IFACE === 'auto' ? ' — the input interface first, then vendor.' : '.'));
   if (IFACE === 'input' && !hasInput) {
-    console.log('  ...but no input interface was found. Try --iface=vendor');
+    console.log('  ...but no input interface was found.');
   }
   if (IFACE === 'vendor' && !wheels.some((d) => d.usagePage === 0xff00)) {
-    console.log('  ...but no vendor interface was found. Try --iface=input');
+    console.log('  ...but no vendor interface was found.');
   }
   console.log('');
   return 0;
@@ -135,7 +145,7 @@ async function releaseWheel() {
 /** --test: nudge the rim left, right, centre and flash the LEDs, so you can
     confirm the hardware responds before trusting the whole chain. */
 async function selfTest() {
-  const wf = new WheelForce({ verbose: true, iface: IFACE, allowInit: ALLOW_INIT });
+  const wf = new WheelForce({ verbose: true, iface: IFACE === 'auto' ? 'input' : IFACE, allowInit: ALLOW_INIT });
   if (!wf.open()) {
     console.log('\n  Could not open the wheel:', wf.lastError, '\n');
     return 1;
@@ -280,10 +290,26 @@ function tryConnect(ws) {
   }
   if (wheelForce) return;
 
-  const wf = new WheelForce({ verbose: true, iface: IFACE, allowInit: ALLOW_INIT });
+  const wf = new WheelForce({ verbose: true, iface: IFACE === 'auto' ? 'input' : IFACE, allowInit: ALLOW_INIT });
   if (!wf.open()) {
     if (!connectAttempted) {
-      console.log('  No wheel yet — will keep looking. (plug it in and power it on)\n');
+      console.log('  No usable wheel interface yet.\n');
+      for (const a of wf.attempts || []) console.log(`    ${a}`);
+      console.log('');
+      if ((wf.attempts || []).some((a) => /held by another process/.test(a))) {
+        // This is the common one and it has an order that fixes it.
+        console.log('  Something else already holds the wheel — most likely a browser tab,');
+        console.log('  or another copy of this bridge. To fix it:');
+        console.log('    1. close the game tab, and quit any other bridge (Ctrl+C)');
+        console.log('    2. start this bridge again');
+        console.log('    3. THEN open the address it prints\n');
+      } else if ((wf.attempts || []).some((a) => /rejects force reports/.test(a))) {
+        console.log('  The wheel is there but refuses force reports on every interface.');
+        console.log('  Power-cycle it: pull the POWER BRICK, not just USB. If it was left');
+        console.log('  in a bad mode by another tool, only that clears it.\n');
+      } else {
+        console.log('  Plug the wheel in and power it on — it has its own power brick.\n');
+      }
       connectAttempted = true;
     }
     scheduleRetry();
@@ -308,7 +334,8 @@ function tryConnect(ws) {
   wf.setLeds(0);
 
   const kind = wf.usagePage === 0x0001 ? 'input' : wf.usagePage === 0xff00 ? 'vendor' : 'other';
-  console.log(`  ${wf.name} connected (${kind} interface, usagePage 0x${(wf.usagePage || 0).toString(16)}).`);
+  console.log(`  ${wf.name} connected on the ${kind} interface ` +
+    `(usagePage 0x${(wf.usagePage || 0).toString(16)}) — writes accepted.`);
   console.log('  Force feedback live. The browser keeps reading the pedals and wheel.\n');
   ws.broadcast({ t: 'hello', wheel: wf.name, ffb: true, buttons: BUTTON_COUNT });
 }
@@ -444,9 +471,9 @@ listenWithFallback(server, START_PORT, 20, (port) => {
   console.log('  switch keeps working. Ctrl+C releases the wheel cleanly.');
   console.log('');
   console.log(`  Interface: ${IFACE}` +
-    (IFACE === 'vendor'
-      ? '   (vendor; a G29 does not accept force feedback here)'
-      : '   (input; the one a G29 accepts force feedback on)'));
+    (IFACE === 'input' ? '   (forced to the input interface)'
+      : IFACE === 'vendor' ? '   (forced to the vendor interface)'
+        : '   (auto: whichever one actually accepts force reports)'));
   console.log('');
   console.log('  No force feedback?  node bridge.mjs --test');
   console.log('  Wheel stuck?        node bridge.mjs --release');
