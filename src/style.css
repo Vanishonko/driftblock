@@ -49,15 +49,33 @@ html, body {
 
 .hidden { display: none !important; }
 
-/* ---------- speed vignette / speedlines ---------- */
+/* ---------- speed vignette ----------
+   Two layers doing two jobs. The first is a plain darkening that follows
+   speed. The second is the one that reads as speed: the clear centre closes
+   in and the edges cool towards blue as the FOV is pushed, so the frame
+   itself feels like it is being squeezed. Driven from main.js through
+   --vig, --vigPull and --vigTint. */
 #app::after {
   content: "";
   position: absolute; inset: 0;
   pointer-events: none;
   z-index: 5;
-  background: radial-gradient(ellipse at 50% 50%, rgba(0,0,0,0) 42%, rgba(0,0,0,0.55) 100%);
+  background: radial-gradient(ellipse at 50% 50%,
+    rgba(0,0,0,0) calc(46% - var(--vigPull, 0%)),
+    rgba(0,0,0,0.62) 100%);
   opacity: var(--vig, 0.35);
   transition: opacity .25s linear;
+}
+#app::before {
+  content: "";
+  position: absolute; inset: 0;
+  pointer-events: none;
+  z-index: 4;
+  background: radial-gradient(ellipse at 50% 50%,
+    rgba(0,0,0,0) 38%,
+    var(--vigTint, rgba(10,14,28,0)) 100%);
+  opacity: var(--vigTintA, 0);
+  transition: opacity .3s linear;
 }
 
 /* ============================================================

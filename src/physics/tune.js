@@ -68,6 +68,16 @@ export const TUNE = {
   alignHandbrake: 0.50,  // rear grip gone => almost no self-align
   yawAirDamp: 2.4,
 
+  // ---- weight transfer.
+  // Braking loads the front and unloads the rear; throttle does the reverse.
+  // This is the one piece of a contact model worth having here, and it is a
+  // MODIFIER on the existing lumped grip rather than a rewrite of it. The
+  // model stays single-body — no per-tyre forces and no contact patch — but
+  // the balance now shifts the way a real car's does, which is what makes
+  // trail-braking rotate the car into a corner and power-on settle it out.
+  transferLong: 0.10,    // grip lost per unit of braking load
+  transferLat: 0.06,     // and per unit of cornering load
+
   // ---- grip (exponential decay rate of lateral velocity, 1/s)
   gripNormal: 8.2,
   gripPower: 1.95,

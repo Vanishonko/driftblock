@@ -5,6 +5,7 @@
    ============================================================ */
 
 import * as THREE from '../../vendor/three.module.js';
+import { TUNE, effectiveTopSpeed } from '../physics/index.js';
 
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -32,6 +33,7 @@ export class ChaseCamera {
     this.shakeDecay = 3.4;
     this._t = 0;
     this._rollCur = 0;
+    this.fovPunch = 0;   // 0..1, how hard the view is being pushed right now
     this._lastX = 0; this._lastZ = 0;
     this.track = null;
     this._hint = -1;
@@ -93,9 +95,15 @@ export class ChaseCamera {
     }
 
     // Speed pulls the camera back and widens the lens. The lens is the single
-    // strongest cue for how fast you are going — a timid FOV makes 190 km/h
-    // read like a Sunday drive, so this opens up hard.
-    const sf = clamp(kmh / (TUNE_TOP_KMH || 190), 0, 1);
+    // strongest cue for how fast you are going, so this opens up hard.
+    //
+    // The reference is the car's ACTUAL top speed, not a constant. It used to
+    // be a hardcoded 190 while the car does 241, so everything above 190 km/h
+    // looked identical — the sense of speed died exactly where it should have
+    // been strongest. It also now follows the spec system, which moves the
+    // top speed, so changing car changes the lens with it.
+    const topKmh = Math.max(80, effectiveTopSpeed() * 3.6);
+    const sf = clamp(kmh / topKmh, 0, 1);
     dist *= 1 + sf * 0.34;
     const boost = clamp(extra.boost || 0, 0, 1);
 
@@ -176,13 +184,29 @@ export class ChaseCamera {
     }
 
     // ---- FOV: speed + boost + drift + the shove in your back
+    //
+    // Two curves rather than one, because the two halves of this do different
+    // jobs. `swell` is the slow widening of speed, on a curved ramp so the
+    // first 100 km/h does not already feel like the last 100. `snap` is the
+    // transient — the shove in your back, the punch of a boost, the lurch of
+    // a big slide — and it hits hard and lets go slowly, which is what makes
+    // it read as acceleration rather than as a slightly different FOV.
     const accelKick = clamp((extra.accel || 0) / 22, -1, 1);
-    const targetFov = fovBase
-      + Math.pow(sf, 0.85) * 34
-      + boost * 14
-      + clamp(s.absSlip * 5.5, 0, 7)
-      + accelKick * 4.5;
-    this.fovCur += (targetFov - this.fovCur) * (1 - Math.exp(-4.5 * dt));
+    const snap = clamp(accelKick, 0, 1) * 9 + boost * 16 + clamp(s.absSlip * 5.5, 0, 8);
+    const swell = Math.pow(sf, 1.35) * 46;
+
+    // Kept so callers read the lens rather than recomputing the curve from
+    // the car state. Two copies of a curve drift apart; one cannot.
+    this.fovSteady = fovBase + swell;
+    // Capped: past about 125 degrees the perspective distortion stops reading
+    // as speed and starts reading as a bug, especially at the edges where
+    // the blocky geometry stretches.
+    const targetFov = Math.min(125, this.fovSteady + snap);
+    // asymmetric: attack fast, release slow. A single rate makes the pull of
+    // acceleration and its absence feel identical, which wastes both.
+    const rate = targetFov > this.fovCur ? 7.5 : 3.2;
+    this.fovCur += (targetFov - this.fovCur) * (1 - Math.exp(-rate * dt));
+    this.fovPunch = clamp((this.fovCur - this.fovSteady) / 22, 0, 1);
     this.cam.fov = this.fovCur;
     this.cam.updateProjectionMatrix();
   }
@@ -200,4 +224,3 @@ export class ChaseCamera {
   }
 }
 
-const TUNE_TOP_KMH = 190;

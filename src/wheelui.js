@@ -215,6 +215,13 @@ export class WheelUI {
   }
 
   refreshControls() {
+    // The panel is built lazily, on first open, but the wheel can connect
+    // before anyone has opened it — and wheel.watch() calls straight through
+    // to here the moment it does. Without this guard that throws on the first
+    // connection of every session, several times, because the hosts below do
+    // not exist yet.
+    if (!this._built) return;
+
     const c = this.wheel.cal;
     const set = (k, v) => { c[k] = v; };
 

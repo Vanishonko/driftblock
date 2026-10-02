@@ -348,9 +348,14 @@ class SpeedLines {
   }
 
   update(dt, car, camPos) {
+    // Deliberately understated. These used to start at 45 km/h and reach 0.78
+    // opacity, which meant they were on for most of a lap and became the
+    // dominant thing on screen. They now begin where the car is actually
+    // quick, fade in gradually, and never get loud — the FOV carries the
+    // sense of speed and these only decorate it.
     const kmh = car.speed * 3.6;
-    const vis = clamp((kmh - 45) / 105, 0, 1);
-    this.mat.opacity = Math.pow(vis, 0.8) * 0.78;
+    const vis = clamp((kmh - 78) / 125, 0, 1);
+    this.mat.opacity = Math.pow(vis, 1.5) * 0.30;
     this.mesh.visible = vis > 0.01;
     if (!this.mesh.visible) return;
 

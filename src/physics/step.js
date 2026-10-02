@@ -88,6 +88,19 @@ export function stepCar(s, input, dt, surf) {
   }
   grip *= surf.grip;
 
+  // ---- weight transfer
+  // Uses LAST frame's accelerations, which is one frame of lag at 120 Hz and
+  // invisible — it avoids reordering the whole step to know this frame's
+  // forces before the grip that produces them.
+  //
+  // Braking (longAccel negative) unloads the rear, so the car rotates on the
+  // way in; power (positive) plants it, so the car settles on the way out.
+  // Cornering load makes the tyres a little less efficient in total, which is
+  // why a car runs out of grip progressively rather than all at once.
+  const longTr = clamp(-(s.longAccel || 0) / 14, -1, 1);
+  const latTr = clamp(Math.abs(s.lateralAccel || 0) / 16, 0, 1);
+  grip *= Math.max(0.45, 1 - T.transferLong * longTr - T.transferLat * latTr);
+
   // ---------------------------------------------------------
   // 4. YAW
   // ---------------------------------------------------------

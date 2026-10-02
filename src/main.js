@@ -69,7 +69,11 @@ ffb.setConfig(wheel.cal);
 // Chrome hides a gamepad until the driver physically touches it. React the
 // instant it appears so the setup panel stops saying "no wheel".
 wheel.watch(() => {
-  if (wheelUI && wheelUI.refreshControls) wheelUI.refreshControls();
+  // wheelUI is declared below, so this only ever runs long after. Both
+  // refreshes are guarded: the panel is built lazily and may not exist yet.
+  if (!wheelUI) return;
+  if (wheelUI.refreshControls) wheelUI.refreshControls();
+  if (wheelUI.refreshStatus) wheelUI.refreshStatus();
 });
 
 const wheelUI = new WheelUI(wheel, ffb, save, () => {
@@ -818,9 +822,27 @@ function frameBody(now) {
       }
     }
 
-    // ---- vignette intensity from speed
-    const vig = clamp(0.30 + (st.speed / TUNE.topSpeed) * 0.55 + (st.boost > 0 ? 0.15 : 0), 0, 1);
-    document.getElementById('app').style.setProperty('--vig', vig.toFixed(3));
+    // ---- screen space effects
+    // Read off the camera's own FOV transient rather than recomputing it, so
+    // the frame and the lens are driven by the same number and cannot drift
+    // apart. `fovPunch` is the part of the FOV that is NOT steady-state speed.
+    const app = document.getElementById('app');
+    const sf01 = clamp(st.speed / TUNE.topSpeed, 0, 1);
+    const punch = camRig.fovPunch || 0;
+
+    const vig = clamp(0.26 + sf01 * 0.42 + punch * 0.20, 0, 1);
+    app.style.setProperty('--vig', vig.toFixed(3));
+
+    // the clear centre closes in with speed, and harder when the view is
+    // being pushed — this is the effect that actually reads as going fast
+    const pull = clamp(sf01 * 9 + punch * 13, 0, 22);
+    app.style.setProperty('--vigPull', pull.toFixed(1) + '%');
+
+    // and the edges cool towards blue under load, then warm back out
+    const tintA = clamp(sf01 * 0.30 + punch * 0.45, 0, 0.8);
+    app.style.setProperty('--vigTintA', tintA.toFixed(3));
+    app.style.setProperty('--vigTint', punch > 0.35
+      ? 'rgba(40,90,190,0.85)' : 'rgba(12,16,32,0.85)');
   }
 
   // the wheel can be plugged in at any time; re-probe periodically
