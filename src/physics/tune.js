@@ -68,6 +68,63 @@ export const TUNE = {
   alignHandbrake: 0.50,  // rear grip gone => almost no self-align
   yawAirDamp: 2.4,
 
+  // ---- tyre model (see tyre.js)
+  // A bicycle model with real slip-based contact patches. Kept in its own
+  // block because these numbers are physical — metres, kilograms, newtons —
+  // where everything above is arcade tuning in game units.
+  tyre: {
+    // G29-adjacent hatchback, roughly: 1180 kg, 2.45 m wheelbase, front
+    // engine so the CG sits forward of centre, and a low-ish CG because it
+    // is a game and a tall one makes the transfer model silly.
+    mass: 1180,
+    a: 1.18,               // CG to front axle (m)
+    b: 1.27,               // CG to rear axle (m)
+    cgHeight: 0.52,        // m
+    // Yaw inertia, measured rather than modelled as a uniform box. A box of
+    // this wheelbase gives a radius of gyration of L/sqrt(12) = 0.71 m, about
+    // half a real car's ~1.30 m, and therefore less than a third of the real
+    // inertia. That is not a small error: it makes the car rotate three times
+    // as fast for the same yaw moment, and the first run of this model spun
+    // at every single steering input because of it.
+    Iz: 1900,              // kg m^2
+    maxSteer: 0.62,        // road wheel angle at full lock (rad, ~35 deg)
+
+    mu: 1.05,              // peak friction on warm tarmac
+    loadSensitivity: 0.22, // mu lost per unit of relative axle load
+
+    // Pacejka-lite shape factors. Lateral wants a lower shape factor than
+    // longitudinal: a tyre makes its best side force at a much larger slip
+    // angle than its best drive.
+    // Solved for rather than guessed. The peak slip angle is set by B, C and
+    // E together and is not obvious from any one of them: the first set tried
+    // here put the lateral peak at 30 degrees, which would have made the car
+    // feel like it was on ice. These give a lateral peak at 7 degrees with a
+    // gentle falloff to 96% by 20, and a longitudinal peak at 12% slip
+    // falling to 87% by 40% — both close to a real tyre's shape.
+    // B sets the cornering stiffness AND, with C and E, where the peak sits.
+    // Those are coupled, and getting it wrong is not a matter of taste: the
+    // first set here had a stiffness of 253,000 N/rad against a realistic
+    // 50-90,000, which put the yaw mode at 400/s. Explicit Euler at 120 Hz
+    // is unstable above 240/s, so the integrator diverged and the car span at
+    // every input — the model looked loose when it was actually blowing up.
+    //
+    // Solved together instead: a realistic 70,000 N/rad AND a peak at 7.5
+    // degrees, which needs a negative E. Pacejka allows that and it is what
+    // decouples the two. The yaw mode is now 111/s, comfortably stable.
+    latB: 8.70, latC: 1.30, latE: -5.19,
+    lonB: 104.7, lonC: 1.62, lonE: 1.00,
+
+    brakeSlip: 0.16,       // slip ratio a full brake application asks for
+    driveSlip: 0.55,       // and how hard the throttle asks
+    handbrakeGrip: 0.34,   // rear grip left with the handbrake up
+
+    drag: 0.42,            // N per (m/s)^2
+    roll: 12.0,            // N per (m/s)
+
+    maxDrive: 7600,        // N at the wheels in the lower gears
+    steerRate: 2.4,        // rad/s the rack can move: a step input is not instant
+  },
+
   // ---- weight transfer.
   // Braking loads the front and unloads the rear; throttle does the reverse.
   // This is the one piece of a contact model worth having here, and it is a
