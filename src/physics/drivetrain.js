@@ -14,6 +14,16 @@ export function updateDrivetrain(s, input, h) {
   const throttle = clamp(input.throttle, 0, 1);
   const idleR = T.idleRpm, redR = T.redlineRpm;
 
+  // ---- shift debounce
+  // Counted down HERE, before any of the branches below can return early.
+  // It used to sit near the end of the function, past the neutral and
+  // reverse branches, which both return early — so selecting neutral set the
+  // timer to 0.10 s and then nothing ever decremented it. _updateGearbox
+  // bails out while it is non-zero, so the gearbox locked solid: you could
+  // shift into neutral and never out of it, and reverse was unreachable
+  // because getting there means passing through neutral.
+  s.shiftBlocked = Math.max(0, s.shiftBlocked - h);
+
   // ---- gear selection
   // playerGear / gear convention:  -1 = reverse, 0 = neutral, 1..6 = gears.
   const nGears = T.gearRatios.length;
@@ -154,7 +164,6 @@ export function updateDrivetrain(s, input, h) {
   s.rpm = clamp(s.rpm, idle, red);
 
   s.clutchEngaged = 1 - disengaged;
-  s.shiftBlocked = Math.max(0, s.shiftBlocked - h);
   // over-revving in manual lights the limiter rather than the gearbox
   if (s.manual && gearT > 1) s.rpm = Math.min(red, wheelRpm);
   // the limiter is real: it cuts drive while you sit on it

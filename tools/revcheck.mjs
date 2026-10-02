@@ -364,4 +364,63 @@ console.log('\nCLUTCH-DUMP LAUNCH');
     `launch ${tall.launch.toFixed(2)}`);
 }
 
+// ---- 11. walking the gate pattern -----------------------------------
+console.log('\nGEAR SELECTION  (paddles through every position, both ways)');
+{
+  // Drives the real _updateGearbox path, because the bug this catches was a
+  // timer that only ticked on the branches that did not return early: you
+  // could shift into neutral and then never out of it.
+  const { Game } = await import('../src/game.js');
+  const hold = (s, sec, input) => { for (let i = 0; i < Math.round(sec / dt); i++) stepCar(s, input, dt, ROAD); };
+
+  // a minimal stand-in for Game: only the gearbox logic is under test
+  const rig = Object.create(Game.prototype);
+  rig.car = new CarState();
+  rig.car.manual = true;
+  rig.manualGearbox = true;
+  rig.audio = { shift() {}, chirp() {} };
+  rig.stats = {};
+
+  const tick = (input) => {
+    rig.car.shiftBlocked = rig.car.shiftBlocked;      // as stepCar leaves it
+    rig._updateGearbox({ gearRequest: 0, shiftUp: false, shiftDown: false, clutch: 1, ...input });
+    hold(rig.car, 0.25, inp({ throttle: 0.3, clutch: 1, manual: true }));
+  };
+
+  const gear = () => rig.car.gear;
+
+  check('starts in a forward gear', gear() >= 1, `gear ${gear()}`);
+  for (let i = 0; i < 6; i++) tick({ shiftUp: true });
+  check('shifts up through the box', gear() === 6, `gear ${gear()}`);
+
+  // all the way down: 6 -> 5 -> 4 -> 3 -> 2 -> 1 -> N -> R
+  const seen = [];
+  for (let i = 0; i < 8; i++) { tick({ shiftDown: true }); seen.push(gear()); }
+  check('shifts down through every gate including neutral and reverse',
+    JSON.stringify(seen) === JSON.stringify([5, 4, 3, 2, 1, 0, -1, -1]),
+    seen.join(' -> '));
+
+  check('reverse is reachable', gear() === -1, `gear ${gear()}`);
+
+  // and back up out of reverse, through neutral, into the box
+  const back = [];
+  for (let i = 0; i < 3; i++) { tick({ shiftUp: true }); back.push(gear()); }
+  check('and out of reverse again', JSON.stringify(back) === JSON.stringify([0, 1, 2]),
+    back.join(' -> '));
+
+  // Neutral must not be a one-way door: down through it into reverse, then
+  // back up out of it into the box. The transitions are the point, not the
+  // absolute numbers, so assert those.
+  const seq = [];
+  const step = (input) => { const before = gear(); tick(input); seq.push(`${before}->${gear()}`); };
+  step({ shiftDown: true });   // 2 -> 1
+  step({ shiftDown: true });   // 1 -> N
+  step({ shiftDown: true });   // N -> R
+  step({ shiftUp: true });     // R -> N
+  step({ shiftUp: true });     // N -> 1
+  check('neutral can be entered and left, both ways',
+    seq.join('  ') === '2->1  1->0  0->-1  -1->0  0->1',
+    seq.join('  '));
+}
+
 console.log(fail===0 ? '\nRev model behaves like an engine.\n' : `\n${fail} FAILED\n`);
