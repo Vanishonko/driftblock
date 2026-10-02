@@ -200,9 +200,30 @@ check('a wheel with no preset is still detected by shape', looksLikeWheel(
    ============================================================ */
 console.log('\nAXIS MAPPING');
 
-function sampleWith(pad, cal) {
+/**
+ * Sample a pad the way the game does: continuously, starting from a moment
+ * when nobody is touching anything.
+ *
+ * The released position of a pedal axis is learned from what the wheel
+ * reports, because it is not always where the preset says it is. A single
+ * sample taken with the throttle already buried would define "floored" as
+ * released, which is not a thing that can happen in the game — sampling
+ * begins at page load, long before anyone reaches for a pedal.
+ */
+function sampleWith(pad, cal, restValue = 1) {
   const w = new WheelInput();
   w.cal = cal;
+  // Which axes are pedals, and where they rest, both come from the
+  // calibration. Hardcoding +1 here broke the Fanatec case, whose pedals
+  // rest at -1 — the same mistake the preset itself is careful to avoid.
+  const atRest = {
+    ...pad,
+    axes: pad.axes.map((a, i) => (i === 2 || i === 5 || i === 1 ? restValue : a)),
+  };
+  w.rawAxes = atRest.axes;
+  w.rawButtons = atRest.buttons.map((b) => b.value);
+  w.wheel = atRest;
+  w.sample();
   w.rawAxes = pad.axes;
   w.rawButtons = pad.buttons.map((b) => b.value);
   w.wheel = pad;
@@ -236,7 +257,7 @@ function sampleWith(pad, cal) {
 
   // a wheel whose pedals rest at -1 instead of +1 must still work
   const flipped = { ...defaultCalibration('fanatec'), throttleAxis: 1, brakeAxis: 2, throttleInvert: false, brakeInvert: false };
-  const fPed = sampleWith(fakePad({ id: 'Fanatec CSL', axes: [0, -1 + 2 * 0.75, -1] }), flipped);
+  const fPed = sampleWith(fakePad({ id: 'Fanatec CSL', axes: [0, -1 + 2 * 0.75, -1] }), flipped, -1);
   check('opposite pedal polarity maps correctly too',
     Math.abs(fPed.throttle - 0.75) < 0.02 && fPed.brake < 0.02,
     `thr ${fPed.throttle.toFixed(2)} brk ${fPed.brake.toFixed(2)}`);
@@ -627,6 +648,61 @@ console.log('\nFORCE DEFAULTS');
   check('and friction is low enough for the aligning torque to be felt',
     d.ffbFriction <= FFB_DEFAULTS.friction + 1e-9 && d.ffbFriction < 0.35,
     `${d.ffbFriction}`);
+}
+
+/* ============================================================
+   PEDALS: the rest position is learned, not assumed
+   ============================================================ */
+console.log('\nPEDAL REST POSITION');
+{
+  // Build a wheel whose pedals rest wherever we say. The old conversion
+  // assumed a rest of exactly -1 after inversion and mapped everything else
+  // relative to that, so an axis parked at 0.000 became a permanently
+  // half-pressed brake and the car would not pull away.
+  const wheelAt = (restValue, axisIndex = 5, invert = true) => {
+    const w = Object.create(WheelInput.prototype);
+    w._rest = new Map();
+    let raw = restValue;
+    w._axis = () => raw;
+    // A full press travels to the OPPOSITE extreme, whatever the rest was.
+    // An earlier version pressed to -restValue, which for a rest of 0 pressed
+    // the pedal not at all and made the check fail for the wrong reason.
+    return { read: () => w._pedal(axisIndex, invert), press: () => { raw = -1; }, release: () => { raw = restValue; } };
+  };
+
+  for (const [label, rest] of [
+    ['resting at +1 (what the preset assumes)', 1],
+    ['resting at 0.000 (what the hardware did)', 0],
+    ['resting at +0.5 (a lazy or dirty pot)', 0.5],
+  ]) {
+    const ped = wheelAt(rest);
+    ped.read();                       // seed the rest from the first reading
+    for (let i = 0; i < 120; i++) ped.read();
+    const released = ped.read();
+    ped.press();
+    const pressed = ped.read();
+    check(`a pedal ${label}: released reads zero`, released < 0.02, released.toFixed(3));
+    check(`a pedal ${label}: fully pressed reads one`, pressed > 0.98, pressed.toFixed(3));
+  }
+
+  // Standing on the brake must not teach it that "pressed" is the rest.
+  const held = wheelAt(1);
+  held.read();
+  held.press();
+  for (let i = 0; i < 600; i++) held.read();   // ten seconds at 60 fps
+  const whileHeld = held.read();
+  held.release();
+  const afterRelease = held.read();
+  check('holding the brake down does not redefine its rest', whileHeld > 0.98,
+    `${whileHeld.toFixed(3)} after 10 s held`);
+  check('and it returns to zero when let go', afterRelease < 0.05, afterRelease.toFixed(3));
+
+  // A wheel whose pedals really do rest at the other end must still work.
+  const inverted = wheelAt(-1, 5, false);
+  inverted.read();
+  for (let i = 0; i < 120; i++) inverted.read();
+  check('a pedal resting at -1 with no inversion still reads zero',
+    inverted.read() < 0.02, inverted.read().toFixed(3));
 }
 
 console.log(failures === 0

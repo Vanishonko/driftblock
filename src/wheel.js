@@ -351,8 +351,62 @@ export class WheelInput {
     if (axisIndex < 0) return 0;
     let v = this._axis(axisIndex);
     if (invert) v = -v;
-    // pedal axes rest at -1 (or +1 if inverted) and travel to the other end
-    return clamp((v + 1) / 2, 0, 1);
+
+    // A pedal rests at one end of its travel — but WHICH end, and exactly
+    // where, depends on the wheel and on the mode it is in. The G29 moves its
+    // axis layout between PS4/PS5/PC modes, which this file already warns
+    // about further up.
+    //
+    // Assuming a rest of exactly -1 (or +1 inverted) fails badly on any axis
+    // sitting anywhere else: an axis resting at 0.000 converts to a
+    // half-pressed pedal that never releases, and the car will not pull away.
+    // That is not hypothetical, it is what a G29 was doing here.
+    //
+    // A released pedal is where the axis sits nearly all of the time, so
+    // learn the rest rather than assuming it: ratchet towards whatever the
+    // axis is doing, with a slow decay so it recovers if the wheel is
+    // re-centred or the mode changes underneath it.
+    const rest = this._pedalRest(axisIndex, v);
+    // `rest` is the RELEASED end, which is the low end after inversion: the
+    // preset says these pedals rest at +1 and travel to -1, and inverting
+    // turns that into resting at -1 and rising to +1 as you press. So the
+    // span runs from rest up to +1.
+    const span = Math.max(0.25, 1 - rest);
+    return clamp((v - rest) / span, 0, 1);
+  }
+
+  /**
+   * The value this axis sits at when the pedal is released.
+   * Ratchets up to whatever the axis reaches, decaying slowly so a long
+   * press cannot permanently redefine the rest position.
+   * @returns {number}
+   */
+  _pedalRest(axisIndex, v) {
+    if (!this._rest) this._rest = new Map();
+
+    // The running MINIMUM of the inverted axis.
+    //
+    // The released end is the low end, so the lowest value the axis has ever
+    // reached IS the released position. That makes this instant rather than
+    // gradual — the first released sample establishes it — and it is
+    // self-correcting: if the estimate is ever wrong because a pedal was
+    // already held when the game started, letting go fixes it immediately.
+    //
+    // Two earlier attempts are worth not repeating. Converging slowly on the
+    // raw value left the brake part-way down for the first seconds of a run,
+    // so the car bogged off the line. Converging fast whenever the axis was
+    // steady was worse: a driver holding constant brake pressure through a
+    // corner would have taught it that "pressed" is rest, and the brakes
+    // would release themselves.
+    // Seeded at the TOP of the travel, not the bottom: a running minimum can
+    // only find the released position if it starts above it, and for a pedal
+    // that is the first sample anyway. Seeding at -1 instead would leave a
+    // wheel whose pedals rest anywhere above that reading as permanently
+    // half-pressed, which is the bug this exists to fix.
+    const prev = this._rest.has(axisIndex) ? this._rest.get(axisIndex) : 1;
+    const next = Math.min(prev, v);
+    this._rest.set(axisIndex, next);
+    return next;
   }
 
   /** Which H-pattern gear position is engaged, or 0 for neutral/unknown. */
