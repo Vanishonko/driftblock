@@ -116,6 +116,20 @@ export function stepCar(s, input, dt, surf) {
   const overSlip = clamp((absSlip - T.tyrePeakSlip) / T.tyreFallRange, 0, 1);
   grip *= 1 - T.tyreFall * overSlip;
 
+  // ---- cornering uses the front tyres up
+  // A tyre already working to hold a line has less left to resist a slide,
+  // so asking for a lot of steering at speed costs grip and the car starts
+  // washing wide instead of turning forever.
+  //
+  // Driven by what the driver is ASKING FOR — steering angle times speed —
+  // and deliberately not by the lateral load the car ends up generating.
+  // That version was tried first and fed back on itself: more slide made
+  // more lateral load, which took more grip, which made more slide. It
+  // loosened every single cell of the envelope, which is the opposite of
+  // what this is for. Driver input cannot run away like that.
+  const cornerWork = clamp(Math.abs(s.steer) * clamp(Math.abs(vf) / 26, 0, 1), 0, 1);
+  grip *= 1 - T.corneringCost * cornerWork;
+
   // ---------------------------------------------------------
   // 4. YAW
   // ---------------------------------------------------------
@@ -166,6 +180,28 @@ export function stepCar(s, input, dt, surf) {
   }
 
   s.yawRate += (targetYaw - s.yawRate) * (1 - Math.exp(-T.yawResponse * h));
+
+  // ---- yaw damping: the faster you go, the harder the car is to rotate
+  //
+  // This is the actual physical term, not a reduction in steering authority.
+  // A tyre resists being rotated in proportion to how fast it is being
+  // dragged sideways, so the yaw moment it generates back always opposes the
+  // rotation, and grows with speed. It is what makes a car feel planted at
+  // 180 and nervous at 40, and it is deliberately separate from `authority`:
+  // that one decides how much yaw the driver ASKS for, this one decides how
+  // much the tyres REFUSE.
+  //
+  // Ramped rather than linear, because below walking pace a tyre is happy to
+  // be pivoted and the car should still turn on a sixpence.
+  // It fades as the slide develops, which matters more than it sounds. Held
+  // at full strength the damping stops the car rotating into its own slide,
+  // so instead of spinning it ploughs sideways and scrubs off everything it
+  // had: an absurd entry ended at 27 degrees of slip doing 6 km/h, against
+  // 70 degrees at 73 km/h without any damping at all. Slower AND less
+  // controlled is the worst of both. Strong while planted, absent once the
+  // rear is away, is what makes a car feel stable without making it inert.
+  const yawDampRate = T.yawDamp * clamp(speed / T.yawDampRamp, 0, 1) * (1 - 0.75 * slideBlend);
+  s.yawRate -= s.yawRate * yawDampRate * h;
   s.yaw += s.yawRate * h;
 
   // ---------------------------------------------------------

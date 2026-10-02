@@ -132,6 +132,27 @@ export const TUNE = {
   // model stays single-body — no per-tyre forces and no contact patch — but
   // the balance now shifts the way a real car's does, which is what makes
   // trail-braking rotate the car into a corner and power-on settle it out.
+  // ---- speed effects on rotation.
+  // A tyre resists being rotated in proportion to how fast it is being
+  // dragged sideways, so the quicker the car is going the harder it is to
+  // turn. That is the term that makes a car feel planted at speed rather
+  // than twitchy, and its absence is why a fast car here turned as easily
+  // as a slow one.
+  yawDamp: 0.7,          // yaw resistance, per second, at speed.
+                         // Settled by measurement, and the range that works
+                         // is narrow. At 1.0 and above a provoked slide never
+                         // came back and an absurd entry ended at 6 km/h
+                         // against 100 km/h here. At 0 the car was looser
+                         // everywhere with lower cornering speeds. 0.7 is
+                         // the value that keeps the resistance without
+                         // costing the recovery.
+  yawDampRamp: 22,       // m/s by which that resistance is at full strength
+
+  // Cornering uses up the front tyres. The harder they are already working
+  // to hold a line, the less of them is left to resist a slide, so the car
+  // washes out at the limit instead of turning forever.
+  corneringCost: 0.10,   // grip given up when asking for everything at speed
+
   // ---- the tyre's own curve.
   // A real tyre makes its best side force at a few degrees of slip and then
   // makes LESS as the slip grows. This model used a constant rate instead,

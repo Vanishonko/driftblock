@@ -74,7 +74,16 @@ export function computeForce(s, opt, cfg) {
   // as the slip angle does, so the rim loads before the car actually lets
   // go — the early warning you steer on.
   const cornering = clamp((s.lateralAccel || 0) / 26, -1, 1);
-  torque += -cornering * 0.35 * speedFactor;
+  torque += -cornering * 0.62 * speedFactor;
+
+  // The rim gets heavier the faster you go, independent of what the car is
+  // doing. This is the same physics as the yaw damping in the handling
+  // model: a tyre resists being dragged sideways in proportion to speed, and
+  // the driver feels that through the wheel long before the car lets go. It
+  // is the difference between a car that feels fast and one that merely
+  // reads fast on the dial.
+  const weight = clamp(speed / 45, 0, 1);
+  torque += -Math.sign(s.slip || 0) * weight * 0.10 * speedFactor;
 
   // a touch of caster weight so the wheel centres itself when crawling
   const lowSpeedCentre = (1 - speedFactor) * clamp(speed / c.minSpeed, 0, 1);
@@ -88,7 +97,7 @@ export function computeForce(s, opt, cfg) {
   // Weight in the rim at speed, and a big drop in weight once the rear
   // lets go — the single most satisfying cue that you are on a drift.
   const driftRelief = opt.drifting ? clamp(s.absSlip / 0.8, 0, 1) : 0;
-  let friction = c.friction * (0.35 + 0.65 * clamp(speed / 20, 0, 1));
+  let friction = c.friction * (0.42 + 0.72 * clamp(speed / 18, 0, 1));
   friction *= (1 - 0.72 * driftRelief);
   if (opt.onGrass) friction *= 0.55;
   friction = clamp(friction, 0, 1);

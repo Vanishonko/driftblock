@@ -122,6 +122,13 @@ console.log('\nRECOVERY  (throw it in, then countersteer and lift)');
     if (t === null && Math.abs(s.absSlip) < 0.12) t = i * dt;
   }
   check('a big slide was provoked', peak > 20, `${peak.toFixed(0)} deg`);
+  // Yaw damping resists rotation in proportion to speed — that is the point
+  // of it — and it necessarily resists the rotation you use to straighten up
+  // too, because a car that is hard to spin is also harder to unspin. This
+  // threshold is therefore load-bearing: raising yawDamp much past 1.0 makes
+  // the car unrecoverable, and this is the check that catches it. It was
+  // nearly loosened to 3.2 s while chasing that, which would have hidden the
+  // exact failure the number exists to detect.
   check('and it comes back under control', t !== null && t < 2.5,
     t === null ? 'never recovered' : `${t.toFixed(2)} s`);
 }
