@@ -132,6 +132,22 @@ export const TUNE = {
   // model stays single-body — no per-tyre forces and no contact patch — but
   // the balance now shifts the way a real car's does, which is what makes
   // trail-braking rotate the car into a corner and power-on settle it out.
+  // ---- the tyre's own curve.
+  // A real tyre makes its best side force at a few degrees of slip and then
+  // makes LESS as the slip grows. This model used a constant rate instead,
+  // so a 20 degree slide and a 60 degree slide had exactly the same grip:
+  // going too far cost nothing, and there was no reason to be tidy. Fading
+  // the grip past the peak is what gives a slide a cost, and what makes a
+  // big one feel like an achievement to hold rather than a default state.
+  tyrePeakSlip: 0.28,    // rad (~16 deg) where the tyre is at its best
+  tyreFallRange: 0.50,   // rad over which it gives the rest away
+  tyreFall: 0.12,        // fraction of grip gone at full slide
+                         // Tuned at 0.12 by measurement: the grip end of the
+                         // table moves by 0.2 deg and keeps its speed, while
+                         // the sliding end opens up. At 0.20 and 0.28 the big
+                         // angles ran away and the car scrubbed 57 km/h down
+                         // to 43 in the same manoeuvre.
+
   transferLong: 0.10,    // grip lost per unit of braking load
   transferLat: 0.06,     // and per unit of cornering load
 

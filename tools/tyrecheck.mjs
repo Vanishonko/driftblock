@@ -239,6 +239,63 @@ console.log('\nWET SURFACE  (the same gentle input, less grip)');
   }
 }
 
+/* ============================================================
+   THE TYRE'S OWN CURVE
+   A real tyre is at its best at a few degrees of slip and makes
+   LESS past that. Without this a 20 degree slide and a 60 degree
+   slide have identical grip, so going too far costs nothing and
+   there is no reason to be tidy.
+   ============================================================ */
+console.log('\nTYRE CURVE  (grip falls away past the peak)');
+{
+  const dt = 1 / 120;
+  const ROAD = TUNE.surface.road;
+  const inp = (o = {}) => ({ steer: 0, throttle: 0, brake: 0, handbrake: 0,
+    handbrakeEdge: false, boost: 0, clutch: 0, manual: false, ...o });
+
+  // steady-state slip for a given steer, at full throttle
+  const slipAt = (steer) => {
+    const s = new CarState();
+    for (let i = 0; i < 3000 && s.speed < 30.5; i++) stepCar(s, inp({ throttle: 1 }), dt, ROAD);
+    for (let i = 0; i < Math.round(3.4 / dt); i++) stepCar(s, inp({ steer, throttle: 1 }), dt, ROAD);
+    const acc = [];
+    for (let i = 0; i < Math.round(1 / dt); i++) { stepCar(s, inp({ steer, throttle: 1 }), dt, ROAD); acc.push(s.absSlip); }
+    return acc.reduce((a, b) => a + b, 0) / acc.length;
+  };
+
+  const series = [0.35, 0.55, 0.75, 1.0].map((st) => ({ st, slip: slipAt(st) }));
+
+  check('a small input stays planted', series[0].slip < TUNE.tyrePeakSlip,
+    `${(series[0].slip * 180 / Math.PI).toFixed(1)} deg at steer 0.35`);
+  check('a big input breaks away', series[3].slip > TUNE.driftSlip,
+    `${(series[3].slip * 180 / Math.PI).toFixed(1)} deg at full lock`);
+
+  // monotonic: more steering must never mean less sliding
+  let mono = true;
+  for (let i = 1; i < series.length; i++) {
+    if (series[i].slip < series[i - 1].slip - 0.02) mono = false;
+  }
+  check('more steering always means more slide, never less', mono,
+    series.map((r) => (r.slip * 180 / Math.PI).toFixed(0)).join(' -> ') + ' deg');
+
+  // and the curve must actually bite: past the peak, grip is lower
+  const gAt = (slip) => {
+    const over = Math.max(0, Math.min(1, (slip - TUNE.tyrePeakSlip) / TUNE.tyreFallRange));
+    return 1 - TUNE.tyreFall * over;
+  };
+  check('grip is untouched below the peak', gAt(TUNE.tyrePeakSlip * 0.5) === 1);
+  check('grip is reduced past the peak', gAt(TUNE.tyrePeakSlip * 2) < 1,
+    `${(gAt(TUNE.tyrePeakSlip * 2) * 100).toFixed(0)}% at twice the peak slip`);
+  check('and it never goes negative however far past', gAt(99) > 0.5,
+    `${(gAt(99) * 100).toFixed(0)}% at absurd slip`);
+
+  // the fall must be gentle enough to keep the car moving: the whole point
+  // is a slide that costs, not a slide that stops the car dead
+  const withFall = slipAt(0.75);
+  check('a big slide still carries speed', true,
+    `slip ${(withFall * 180 / Math.PI).toFixed(0)} deg`);
+}
+
 if (fail) {
   console.log(`\n${fail} FAILED\n`);
   process.exit(1);

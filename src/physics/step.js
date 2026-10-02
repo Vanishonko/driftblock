@@ -101,6 +101,21 @@ export function stepCar(s, input, dt, surf) {
   const latTr = clamp(Math.abs(s.lateralAccel || 0) / 16, 0, 1);
   grip *= Math.max(0.45, 1 - T.transferLong * longTr - T.transferLat * latTr);
 
+  // ---- the tyre's own curve: grip falls away past the peak
+  //
+  // This is the whole difference between a slide that holds and a slide
+  // that runs away. Up to the peak the car is at its best; past it the tyres
+  // give up progressively, so a big angle is genuinely harder to hold than a
+  // small one and the driver is rewarded for keeping it tidy.
+  //
+  // Applied at the END and only ever downwards, so it can take grip away but
+  // never add it. That ordering is deliberate: an earlier attempt let the
+  // drive demand draw down a shared budget BEFORE the lateral force was
+  // worked out, which coupled the two into a feedback loop and inverted the
+  // whole drift envelope.
+  const overSlip = clamp((absSlip - T.tyrePeakSlip) / T.tyreFallRange, 0, 1);
+  grip *= 1 - T.tyreFall * overSlip;
+
   // ---------------------------------------------------------
   // 4. YAW
   // ---------------------------------------------------------

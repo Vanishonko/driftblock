@@ -1,6 +1,16 @@
 /* ============================================================
    TYRE — a real slip-based contact model.
 
+   *** NOT WIRED INTO THE GAME. Nothing imports this. ***
+   The handling you drive runs on the arcade grip model in step.js,
+   which now carries the tyre curve from this file's findings. This
+   module is the full bicycle model: it produces sensible, ordered slip
+   angles and every piece of it is verified, but it still scrubs speed
+   to a standstill in a long slide and is not drivable. Kept because the
+   physics in it is right and the remaining fault is narrow, not
+   because anything depends on it.
+   Measure it with: node tools/tyreharness.mjs
+
    The rest of the game models grip as a single exponential decay on
    lateral velocity. That is a fine arcade shortcut and it is what the
    handling was tuned against, but it has no notion of a contact patch:
