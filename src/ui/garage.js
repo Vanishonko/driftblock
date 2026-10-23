@@ -7,7 +7,7 @@
    ============================================================ */
 
 import * as THREE from '../../vendor/three.module.js';
-import { PAINTS } from '../render/car.js';
+import { PAINTS, SECRET_PAINT } from '../render/car.js';
 import { SPECS, applySpec } from '../physics/specs.js';
 import { TUNE } from '../physics/index.js';
 import { patch as patchSettings } from '../core/settings.js';
@@ -66,9 +66,9 @@ function buildCarCards() {
   const stock = document.createElement('button');
   stock.className = 'card car-card' + (active === 'stock' ? ' sel' : '');
   stock.innerHTML = `<div class="car-thumb stock"></div>
-    <h3>SLK 200 K</h3>
-    <div class="desc">The factory R170 shell. Balanced, blocky, yours.</div>
-    <div class="meta">STOCK BODY</div>`;
+    <h3>ORIGINAL</h3>
+    <div class="desc">The original DRIFTBLOCK car. Bright, boxy, unbothered.</div>
+    <div class="meta">OG BODY</div>`;
   stock.onclick = () => chooseCar('stock');
   stock.onmouseenter = () => deps.audio.ui('move');
   host.appendChild(stock);
@@ -146,24 +146,30 @@ export function buildGarage() {
   if (!ph) return;
   buildCarCards();
   ph.innerHTML = '';
-  // A save written before the black palette still names an old paint id.
-  // main.js already falls back to the first paint for those; show the same
-  // fallback here so the garage highlight matches the car on track.
-  const active = PAINTS.some((p) => p.id === deps.save.paint) ? deps.save.paint : PAINTS[0].id;
-  for (const p of PAINTS) {
+  const secret = deps.save.car === 'brabus' && deps.save.brabusUnlocked;
+  // The original car can wear any OG paint. The owner's car is fixed black.
+  const palette = secret ? [SECRET_PAINT] : PAINTS;
+  const active = secret
+    ? SECRET_PAINT.id
+    : (PAINTS.some((p) => p.id === deps.save.paint) ? deps.save.paint : PAINTS[0].id);
+  for (const p of palette) {
     const el = document.createElement('button');
-    el.className = 'card' + (p.id === active ? ' sel' : '');
+    el.className = 'card' + (p.id === active ? ' sel' : '') + (secret ? ' fixed' : '');
     const col = '#' + new THREE.Color(p.body).getHexString();
     const acc = '#' + new THREE.Color(p.accent).getHexString();
     el.innerHTML = `<div class="swatch" style="background:linear-gradient(90deg, ${col} 65%, ${acc} 65%)"></div>
       <h3>${p.name}</h3>`;
-    el.onclick = () => {
-      // Paint changes the mesh, so this one does need a rebuild. Save
-      // immediately rather than waiting for the debounce.
-      patchSettings({ paint: p.id });
-      deps.flush();
-      location.reload();
-    };
+    if (secret) {
+      el.style.cursor = 'default';
+    } else {
+      el.onclick = () => {
+        // Paint changes the mesh, so this one does need a rebuild. Save
+        // immediately rather than waiting for the debounce.
+        patchSettings({ paint: p.id });
+        deps.flush();
+        location.reload();
+      };
+    }
     el.onmouseenter = () => deps.audio.ui('move');
     ph.appendChild(el);
   }

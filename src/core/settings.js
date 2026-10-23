@@ -27,7 +27,7 @@ const WRITE_DEBOUNCE_MS = 150;
  */
 export const DEFAULTS = Object.freeze({
   schema: SCHEMA,
-  paint: 'obsidian',
+  paint: 'magenta',
   spec: 'balanced',        // was `tune` in v1
   car: 'stock',            // stock | brabus (hidden)
   brabusUnlocked: false,  // set by typing the garage code

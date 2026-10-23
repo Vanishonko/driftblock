@@ -363,6 +363,7 @@ export function createImportedCar(paint) {
   model.add(rearFill);
 
   return {
+    _imported: true,
     root, chassis, body: model, wheels, flames: [],
     brakeMat, brakeMats, headMat, paint, steerWheel: cockpit.steerWheel, needles: cockpit.needles, needle2d: cockpit.needle2d, hazard,
     _roll: 0, _pitch: 0, _steerVis: 0,

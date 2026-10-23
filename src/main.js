@@ -6,7 +6,7 @@ import * as THREE from '../vendor/three.module.js';
 import { Input } from './input.js';
 import { GameAudio } from './audio.js';
 import { TRACK_DEFS, Track, previewOutline } from './render/track.js';
-import { createCarMesh, updateCarVisual, PAINTS } from './render/car.js';
+import { createCarMesh, updateCarVisual, PAINTS, SECRET_PAINT } from './render/car.js';
 import { ChaseCamera } from './render/camera.js';
 import { Effects } from './render/effects.js';
 import { HUD } from './render/hud.js';
@@ -92,8 +92,9 @@ const wheelUI = new WheelUI(wheel, ffb, save, () => {
     if (info.wheel) hud.toast('WHEEL: ' + info.name, 2.2);
   } catch { /* no bridge running, which is the normal case */ }
 })();
-const paint = PAINTS.find((p) => p.id === save.paint) || PAINTS[0];
 const secretCar = !!(save.brabusUnlocked && save.car === 'brabus');
+const stockPaint = PAINTS.find((p) => p.id === save.paint) || PAINTS[0];
+const paint = secretCar ? SECRET_PAINT : stockPaint;
 audio.setMasterVolume(save.volume ?? 0.9);
 audio.setEngineVolume(save.engineVol ?? 1.15);
 audio.setWindVolume(save.windVol ?? 1.0);
@@ -104,6 +105,7 @@ let effects = null;
 let carMesh = null;
 let game = null;
 const camRig = new ChaseCamera(camera);
+camRig.carKind = secretCar ? 'brabus' : 'stock';
 
 // Sizing, DPR, UI scale and fullscreen live in core/display.js; it needs the
 // canvas, renderer and camera, but owns none of them.

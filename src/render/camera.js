@@ -38,6 +38,7 @@ export class ChaseCamera {
     this.track = null;
     this._hint = -1;
     this.cockpitZoom = 0;   // FOV offset, only applied in HOOD
+    this.carKind = 'stock'; // stock uses the original rig distances
     this._bindCockpitZoom();
   }
 
@@ -102,11 +103,21 @@ export class ChaseCamera {
 
     // ---- rig dimensions per mode
     let dist, height, lookAhead, fovBase, stiffness;
+    const brabus = this.carKind === 'brabus';
     switch (CAM_MODES[this.mode]) {
-      case 'CLOSE': dist = 3.4; height = 1.4; lookAhead = 5; fovBase = 66; stiffness = 10; break;
-      case 'FAR': dist = 10.4; height = 4.0; lookAhead = 14; fovBase = 63; stiffness = 5; break;
-      case 'HOOD': dist = -0.15; height = 1.42; lookAhead = 26; fovBase = 72; stiffness = 22; break;
-      default: dist = 6.7; height = 2.55; lookAhead = 11; fovBase = 68; stiffness = 7;
+      case 'CLOSE':
+        if (brabus) { dist = 3.4; height = 1.4; lookAhead = 5; fovBase = 66; stiffness = 10; }
+        else { dist = 6.6; height = 2.3; lookAhead = 9; fovBase = 74; stiffness = 9; }
+        break;
+      case 'FAR':
+        if (brabus) { dist = 10.4; height = 4.0; lookAhead = 14; fovBase = 63; stiffness = 5; }
+        else { dist = 12.6; height = 4.6; lookAhead = 17; fovBase = 63; stiffness = 5; }
+        break;
+      case 'HOOD':
+        dist = -0.15; height = 1.42; lookAhead = 26; fovBase = brabus ? 72 : 76; stiffness = 22; break;
+      default:
+        if (brabus) { dist = 6.7; height = 2.55; lookAhead = 11; fovBase = 68; stiffness = 7; }
+        else { dist = 7.9; height = 2.95; lookAhead = 13; fovBase = 68; stiffness = 7; }
     }
 
     // Speed pulls the camera back and widens the lens. The lens is the single
@@ -176,9 +187,9 @@ export class ChaseCamera {
       // Too far back and the bodywork eats a third of the screen.
       const rx = Math.cos(s.yaw), rz = -Math.sin(s.yaw);
       this.cam.position.set(
-        s.x - chx * 0.38 + rx * 0.32 + shX * 0.25,
+        s.x - chx * (brabus ? 0.38 : 0.50) + rx * 0.32 + shX * 0.25,
         0.97 + shY * 0.18,
-        s.z - chz * 0.38 + rz * 0.32 + shZ * 0.25
+        s.z - chz * (brabus ? 0.38 : 0.50) + rz * 0.32 + shZ * 0.25
       );
       this.cam.rotation.order = 'YXZ';
       this.cam.rotation.set(
