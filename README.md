@@ -4,6 +4,10 @@ A 3D drift racing game with blocky minimalist graphics, running entirely in the
 browser. No build step, no asset files — every circuit, sound and particle is
 generated at runtime.
 
+The car is a blocky portrait of the owner's graphite-black metallic Mercedes-Benz SLK 200
+Kompressor (R170 facelift): **7-KNJ-43** plates, a **BRABUS** boot badge, and the
+green tree air freshener hanging from the mirror.
+
 ![gameplay](docs/gameplay.png)
 
 ---
@@ -383,7 +387,13 @@ src/
     specs.js          the car specs (balanced / drift / grip / monster)
     index.js          the public surface
   render/
-    car.js            blocky chassis mesh + visual state
+    car.js            blocky facelift SLK R170 mesh, wheels + visual state
+    car-spec.js       visible R170 wheelbase/track shared with the effects
+    slk.js            the R170 shell, greenhouse, side details and badges
+    slk-geo.js        low-poly profile/plate/arch shape helpers
+    slk-fenders.js    side skins, open wheel arches, fender lips, wheel wells
+    slk-lights.js     mesh grille, blocky faceted headlamps and triangular tail lamps
+    badge.js          three-pointed star, runtime BRABUS badge, NL plate + grille mesh
     track.js          procedural circuits, scenery, palettes, lighting
     camera.js         chase rig (follows velocity, wall-aware)
     effects.js        smoke, skid marks, sparks, speed lines

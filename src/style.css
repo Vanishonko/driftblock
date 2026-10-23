@@ -360,6 +360,12 @@ html, body {
 .card .desc { font-size: 12px; line-height: 1.55; color: var(--dim); min-height: 52px; }
 .card .meta { margin-top: 10px; font-family: var(--mono); font-size: 10px; letter-spacing: .12em; color: var(--accent2); }
 .card .swatch { height: 26px; margin-bottom: 12px; border: 2px solid rgba(0,0,0,.4); }
+.car-thumb { height: 86px; margin-bottom: 12px; border: 2px solid rgba(0,0,0,.4); background-size: cover; background-position: center; background-color: #07080a; }
+.car-thumb.stock { background: linear-gradient(135deg, #ff2e7e 0 34%, #2fe0ff 34% 67%, #ffd23f 67% 100%); }
+.car-thumb.brabus { background-image: url('../docs/slk-front.png'); }
+.card.hidden-car { border-color: rgba(255,46,126,.42); }
+.card.fixed { cursor: default; }
+.card .secret-tag { margin-top: 9px; font-family: var(--mono); font-size: 10px; letter-spacing: .14em; color: var(--accent); }
 
 .howto { width: 100%; max-width: 700px; display: flex; flex-direction: column; gap: 10px; }
 .how-row {
