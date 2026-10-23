@@ -316,6 +316,10 @@ html, body {
   margin-top: 16px; font-family: var(--mono); font-size: 12px;
   letter-spacing: .38em; text-transform: uppercase; color: var(--dim);
 }
+.game-version {
+  margin-top: 12px; font-family: var(--mono); font-size: 11px;
+  letter-spacing: .26em; color: var(--accent2); opacity: .78;
+}
 
 .screen-title {
   font-family: var(--mono); font-size: 15px; font-weight: 700;
