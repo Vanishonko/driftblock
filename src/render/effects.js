@@ -4,6 +4,7 @@
    ============================================================ */
 
 import * as THREE from '../../vendor/three.module.js';
+import { WHEEL_X, WHEEL_Z } from './car-spec.js';
 
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 
@@ -418,11 +419,11 @@ export class Effects {
     this.sparks.setFog(palette.fog, palette.fogDensity);
   }
 
-  /** wheel contact points in world space */
+  /** wheel contact points in world space (visual R170 track / wheelbase) */
   static wheelPositions(s) {
     const fx = Math.sin(s.yaw), fz = Math.cos(s.yaw);
     const rx = Math.cos(s.yaw), rz = -Math.sin(s.yaw);
-    const a = 1.42, b = -1.42, w = 0.86;
+    const a = WHEEL_Z, b = -WHEEL_Z, w = WHEEL_X;
     return [
       { x: s.x + fx * a + rx * w, z: s.z + fz * a + rz * w, front: true, left: true },
       { x: s.x + fx * a - rx * w, z: s.z + fz * a - rz * w, front: true, left: false },

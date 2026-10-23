@@ -27,8 +27,10 @@ const WRITE_DEBOUNCE_MS = 150;
  */
 export const DEFAULTS = Object.freeze({
   schema: SCHEMA,
-  paint: 'magenta',
+  paint: 'obsidian',
   spec: 'balanced',        // was `tune` in v1
+  car: 'stock',            // stock | brabus (hidden)
+  brabusUnlocked: false,  // set by typing the garage code
   bests: {},
   wheel: null,             // the whole wheel calibration, see input/wheel.js
   volume: 0.9,

@@ -37,6 +37,21 @@ export class ChaseCamera {
     this._lastX = 0; this._lastZ = 0;
     this.track = null;
     this._hint = -1;
+    this.cockpitZoom = 0;   // FOV offset, only applied in HOOD
+    this._bindCockpitZoom();
+  }
+
+  /** = / - adjust the cockpit lens; ignored outside HOOD. */
+  _bindCockpitZoom() {
+    window.addEventListener('keydown', (e) => {
+      if (CAM_MODES[this.mode] !== 'HOOD') return;
+      let d = 0;
+      if (e.code === 'Equal' || e.code === 'NumpadAdd') d = -2;
+      else if (e.code === 'Minus' || e.code === 'NumpadSubtract') d = 2;
+      if (!d) return;
+      this.cockpitZoom = clamp(this.cockpitZoom + d, -26, 18);
+      e.preventDefault();
+    });
   }
 
   /**
@@ -88,10 +103,10 @@ export class ChaseCamera {
     // ---- rig dimensions per mode
     let dist, height, lookAhead, fovBase, stiffness;
     switch (CAM_MODES[this.mode]) {
-      case 'CLOSE': dist = 6.6; height = 2.3; lookAhead = 9; fovBase = 74; stiffness = 9; break;
-      case 'FAR': dist = 12.6; height = 4.6; lookAhead = 17; fovBase = 63; stiffness = 5; break;
-      case 'HOOD': dist = -0.15; height = 1.42; lookAhead = 26; fovBase = 76; stiffness = 22; break;
-      default: dist = 7.9; height = 2.95; lookAhead = 13; fovBase = 68; stiffness = 7;
+      case 'CLOSE': dist = 3.4; height = 1.4; lookAhead = 5; fovBase = 66; stiffness = 10; break;
+      case 'FAR': dist = 10.4; height = 4.0; lookAhead = 14; fovBase = 63; stiffness = 5; break;
+      case 'HOOD': dist = -0.15; height = 1.42; lookAhead = 26; fovBase = 72; stiffness = 22; break;
+      default: dist = 6.7; height = 2.55; lookAhead = 11; fovBase = 68; stiffness = 7;
     }
 
     // Speed pulls the camera back and widens the lens. The lens is the single
@@ -159,14 +174,15 @@ export class ChaseCamera {
       // frame — that strip is what makes the view read as a car rather than
       // a floating camera, and it is the reference you judge a drift against.
       // Too far back and the bodywork eats a third of the screen.
+      const rx = Math.cos(s.yaw), rz = -Math.sin(s.yaw);
       this.cam.position.set(
-        s.x + chx * 1.24 + shX * 0.30,
-        1.27 + shY * 0.22,
-        s.z + chz * 1.24 + shZ * 0.30
+        s.x - chx * 0.38 + rx * 0.32 + shX * 0.25,
+        0.97 + shY * 0.18,
+        s.z - chz * 0.38 + rz * 0.32 + shZ * 0.25
       );
       this.cam.rotation.order = 'YXZ';
       this.cam.rotation.set(
-        -0.065 + shY * 0.05,
+        -0.030 + shY * 0.05,
         s.yaw + Math.PI + shX * 0.05,
         this._rollCur * 0.45
       );
@@ -197,7 +213,8 @@ export class ChaseCamera {
 
     // Kept so callers read the lens rather than recomputing the curve from
     // the car state. Two copies of a curve drift apart; one cannot.
-    this.fovSteady = fovBase + swell;
+    const cockpitZoom = CAM_MODES[this.mode] === 'HOOD' ? this.cockpitZoom : 0;
+    this.fovSteady = fovBase + swell + cockpitZoom;
     // Capped: past about 125 degrees the perspective distortion stops reading
     // as speed and starts reading as a bug, especially at the edges where
     // the blocky geometry stretches.

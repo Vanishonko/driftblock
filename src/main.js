@@ -50,7 +50,7 @@ renderer.toneMappingExposure = 1.42;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(68, innerWidth / innerHeight, 0.35, 4000);
+const camera = new THREE.PerspectiveCamera(68, innerWidth / innerHeight, 0.025, 4000);
 
 const input = new Input();
 const audio = new GameAudio();
@@ -93,6 +93,7 @@ const wheelUI = new WheelUI(wheel, ffb, save, () => {
   } catch { /* no bridge running, which is the normal case */ }
 })();
 const paint = PAINTS.find((p) => p.id === save.paint) || PAINTS[0];
+const secretCar = !!(save.brabusUnlocked && save.car === 'brabus');
 audio.setMasterVolume(save.volume ?? 0.9);
 audio.setEngineVolume(save.engineVol ?? 1.15);
 audio.setWindVolume(save.windVol ?? 1.0);
@@ -136,7 +137,7 @@ function loadWorld(trackDef) {
   effects = new Effects(scene, trackDef.palette);
 
   if (carMesh) scene.remove(carMesh.root);
-  carMesh = createCarMesh(paint);
+  carMesh = createCarMesh(paint, { imported: secretCar });
   scene.add(carMesh.root);
 
   camRig.track = track;
