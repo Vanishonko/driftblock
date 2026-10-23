@@ -364,7 +364,7 @@ function buildOptions() {
     };
 
     seg('MINI-TURBO', 'AUTO releases on leaving a charged drift and on your button. BUTTON is button only.',
-      save.boostMode || 'auto',
+      save.boostMode || 'manual',
       [['auto', 'AUTO'], ['manual', 'BUTTON'], ['off', 'OFF']],
       (v) => { patchSettings({ boostMode: v }); if (game) game.boostMode = v; });
 
@@ -491,7 +491,7 @@ function startRun(trackDef, mode) {
   requestAnimationFrame(() => {
     if (!track || track.def.id !== trackDef.id) loadWorld(trackDef);
     game.manualGearbox = !!save.gearbox;
-    game.boostMode = save.boostMode || 'auto';
+    game.boostMode = save.boostMode || 'manual';
     // this click is a user gesture, so it is the right moment to go fullscreen
     if (save.fullscreen !== false && !isFullscreen()) requestFullscreen();
     game.start(mode);
