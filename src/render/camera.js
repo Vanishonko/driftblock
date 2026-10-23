@@ -114,7 +114,7 @@ export class ChaseCamera {
         else { dist = 12.6; height = 4.6; lookAhead = 17; fovBase = 63; stiffness = 5; }
         break;
       case 'HOOD':
-        dist = -0.15; height = 1.42; lookAhead = 26; fovBase = brabus ? 72 : 76; stiffness = 22; break;
+        dist = -0.15; height = 1.42; lookAhead = 26; fovBase = brabus ? 72 : 74; stiffness = 22; break;
       default:
         if (brabus) { dist = 6.7; height = 2.55; lookAhead = 11; fovBase = 68; stiffness = 7; }
         else { dist = 7.9; height = 2.95; lookAhead = 13; fovBase = 68; stiffness = 7; }
@@ -186,16 +186,21 @@ export class ChaseCamera {
       // a floating camera, and it is the reference you judge a drift against.
       // Too far back and the bodywork eats a third of the screen.
       const rx = Math.cos(s.yaw), rz = -Math.sin(s.yaw);
+      // BRABUS: driver-eye cockpit. Original car: a real hood cam, out over
+      // the bonnet and centred, otherwise the blocky cabin fills the screen.
+      const back = brabus ? -0.38 : 0.98;
+      const side = brabus ? 0.32 : 0.0;
+      const eyeY = brabus ? 0.97 : 1.26;
       this.cam.position.set(
-        s.x - chx * (brabus ? 0.38 : 0.50) + rx * 0.32 + shX * 0.25,
-        0.97 + shY * 0.18,
-        s.z - chz * (brabus ? 0.38 : 0.50) + rz * 0.32 + shZ * 0.25
+        s.x + chx * back + rx * side + shX * 0.25,
+        eyeY + shY * 0.18,
+        s.z + chz * back + rz * side + shZ * 0.25
       );
       this.cam.rotation.order = 'YXZ';
       this.cam.rotation.set(
-        -0.030 + shY * 0.05,
+        (brabus ? -0.030 : -0.040) + shY * 0.05,
         s.yaw + Math.PI + shX * 0.05,
-        this._rollCur * 0.45
+        this._rollCur * (brabus ? 0.45 : 0.28)
       );
       this.look.set(aimX, aimY, aimZ);
     } else {
