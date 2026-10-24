@@ -411,6 +411,8 @@ export class Effects {
     this._skidAcc = 0;
     this._smokeAcc = 0;
     this._wheelSlipPrev = [0, 0, 0, 0];
+    this.wheelX = WHEEL_X;
+    this.wheelZ = WHEEL_Z;
   }
 
   setPalette(palette) {
@@ -419,11 +421,21 @@ export class Effects {
     this.sparks.setFog(palette.fog, palette.fogDensity);
   }
 
-  /** wheel contact points in world space (visual R170 track / wheelbase) */
-  static wheelPositions(s) {
+  /** Match smoke/skid contact points to the visible car (cosmetic only). */
+  setWheelSpec(spec) {
+    if (!spec) return;
+    const x = Number(spec.x), z = Number(spec.z);
+    if (Number.isFinite(x) && Number.isFinite(z)) {
+      this.wheelX = x;
+      this.wheelZ = z;
+    }
+  }
+
+  /** wheel contact points in world space (visual car track / wheelbase) */
+  static wheelPositions(s, wheelX = WHEEL_X, wheelZ = WHEEL_Z) {
     const fx = Math.sin(s.yaw), fz = Math.cos(s.yaw);
     const rx = Math.cos(s.yaw), rz = -Math.sin(s.yaw);
-    const a = WHEEL_Z, b = -WHEEL_Z, w = WHEEL_X;
+    const a = wheelZ, b = -wheelZ, w = wheelX;
     return [
       { x: s.x + fx * a + rx * w, z: s.z + fz * a + rz * w, front: true, left: true },
       { x: s.x + fx * a - rx * w, z: s.z + fz * a - rz * w, front: true, left: false },
@@ -440,7 +452,7 @@ export class Effects {
   update(dt, s, opts) {
     this._t += dt;
     const { onGrass, boost } = opts;
-    const wheels = Effects.wheelPositions(s);
+    const wheels = Effects.wheelPositions(s, this.wheelX, this.wheelZ);
     const rx = Math.cos(s.yaw), rz = -Math.sin(s.yaw);
 
     // ---- how hard each wheel is sliding -------------------------------

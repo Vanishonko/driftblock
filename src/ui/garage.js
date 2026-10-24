@@ -45,7 +45,7 @@ function bindSecretCode() {
   });
 }
 
-/** Select the stock shell or the unlocked imported car, then rebuild the scene. */
+/** Select the original shell, the imported Tourer, or the unlocked R170. */
 function chooseCar(id) {
   if (id === 'brabus' && !deps.save.brabusUnlocked) return;
   if ((deps.save.car || 'stock') === id) return;
@@ -55,13 +55,14 @@ function chooseCar(id) {
   location.reload();
 }
 
-/** Car cards: the factory shell plus the secret, once unlocked. */
+/** Car cards: the factory shell, the imported Tourer, and the secret R170. */
 function buildCarCards() {
   const host = document.getElementById('carCards');
   if (!host) return;
   host.innerHTML = '';
   const unlocked = !!deps.save.brabusUnlocked;
-  const active = deps.save.car === 'brabus' && unlocked ? 'brabus' : 'stock';
+  const active = deps.save.car === 'brabus' && unlocked ? 'brabus'
+    : deps.save.car === 'citroen' ? 'citroen' : 'stock';
 
   const stock = document.createElement('button');
   stock.className = 'card car-card' + (active === 'stock' ? ' sel' : '');
@@ -72,6 +73,16 @@ function buildCarCards() {
   stock.onclick = () => chooseCar('stock');
   stock.onmouseenter = () => deps.audio.ui('move');
   host.appendChild(stock);
+
+  const citroen = document.createElement('button');
+  citroen.className = 'card car-card' + (active === 'citroen' ? ' sel' : '');
+  citroen.innerHTML = `<div class="car-thumb citroen"></div>
+    <h3>CITROEN C5 TOURER</h3>
+    <div class="desc">The imported C5 Tourer — a long-roof French cruiser with steering front wheels and working brake lights.</div>
+    <div class="meta">IMPORTED · CC BY 4.0</div>`;
+  citroen.onclick = () => chooseCar('citroen');
+  citroen.onmouseenter = () => deps.audio.ui('move');
+  host.appendChild(citroen);
 
   if (!unlocked) return;
   const hidden = document.createElement('button');

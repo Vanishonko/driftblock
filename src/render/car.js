@@ -1,7 +1,8 @@
 /* ============================================================
-   CAR — the blocky facelift SLK R170 shell (2000-2004), its wheels,
-   and the visual layer that reads the physics state (body roll, squat,
-   wheel spin, steering, brake lights, boost flames).
+   CAR — the blocky facelift SLK R170 shell (2000-2004), the imported
+   Citroen C5 Tourer, their wheels, and the visual layer that reads the
+   physics state (body roll, squat, wheel spin, steering, brake lights,
+   boost flames).
 
    COSMETIC ONLY. The simulation knows nothing about this file: it
    moves a CarState around using TUNE, and updateCarVisual follows it.
@@ -12,6 +13,7 @@
 import * as THREE from '../../vendor/three.module.js';
 import { TUNE } from '../physics/index.js';
 import { createImportedCar } from './slk-ac.js';
+import { createCitroenCar } from './citroen-ac.js';
 import { createOgCarMesh, updateOgCarVisual, OG_PAINTS } from './og-car.js';
 
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
@@ -24,13 +26,22 @@ export const SECRET_PAINT = Object.freeze({
   body: 0x07080a, trim: 0x050506, accent: 0xd3dae5,
 });
 
-/** Build the original blocky car, or the hidden imported R170. */
+/** Build the original blocky car, the imported Tourer, or the hidden R170. */
 export function createCarMesh(paint, opts = {}) {
-  if (opts.imported) {
-    const imported = createImportedCar(paint);
-    if (imported) return imported;
+  if (opts.kind === 'citroen') {
+    const citroen = createCitroenCar(paint);
+    if (citroen) return citroen;
   }
-  return createOgCarMesh(paint);
+  if (opts.kind === 'brabus' || opts.imported) {
+    const imported = createImportedCar(paint);
+    if (imported) {
+      imported.kind = 'brabus';
+      return imported;
+    }
+  }
+  const og = createOgCarMesh(paint);
+  og.kind = 'stock';
+  return og;
 }
 
 /** Route visual updates to the correct car. */

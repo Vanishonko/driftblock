@@ -367,6 +367,7 @@ html, body {
 .car-thumb { height: 86px; margin-bottom: 12px; border: 2px solid rgba(0,0,0,.4); background-size: cover; background-position: center; background-color: #07080a; }
 .car-thumb.stock { background: linear-gradient(135deg, #ff2e7e 0 34%, #2fe0ff 34% 67%, #ffd23f 67% 100%); }
 .car-thumb.brabus { background-image: url('../docs/slk-front.png'); }
+.car-thumb.citroen { background-image: url('../docs/citroen-tourer-front.png'); background-position: center 62%; }
 .card.hidden-car { border-color: rgba(255,46,126,.42); }
 .card.fixed { cursor: default; }
 .card .secret-tag { margin-top: 9px; font-family: var(--mono); font-size: 10px; letter-spacing: .14em; color: var(--accent); }
@@ -634,6 +635,11 @@ html, body {
   font: 500 11px/1.5 ui-monospace, Menlo, monospace;
   color: var(--dim, #8b93a7); opacity: .85;
 }
+
+/* ---- model attribution ---- */
+.credits { max-width: 78ch; line-height: 1.7; }
+.credits a { color: var(--accent2); text-decoration: underline; text-underline-offset: 2px; }
+.credits a:hover { color: #fff; }
 
 /* ---- spec cards in the pause menu: same cards, tighter ---- */
 .card.compact { padding: 8px 11px; }

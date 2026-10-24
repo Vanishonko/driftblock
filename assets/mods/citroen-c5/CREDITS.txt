@@ -1,0 +1,14 @@
+Citroen C5 Tourer — model attribution
+=====================================
+
+"Citroen C5 Sedan And Estate" (https://skfb.ly/pvzsT) by Nieve5677 is licensed
+under Creative Commons Attribution (http://creativecommons.org/licenses/by/4.0/).
+
+Modifications for DRIFTBLOCK:
+  - Only the Tourer/estate body is used; the saloon is excluded.
+  - The four wheels are separated onto steer/spin pivots for animation.
+  - The body and wheels are decimated for real-time rendering.
+  - Materials are replaced with lightweight game materials.
+
+The generated citroen-c5-tourer-game.glb in this folder is the only model the
+game loads. The original source archive stays outside the repository.

@@ -7,6 +7,7 @@ import { Input } from './input.js';
 import { GameAudio } from './audio.js';
 import { TRACK_DEFS, Track, previewOutline } from './render/track.js';
 import { createCarMesh, updateCarVisual, PAINTS, SECRET_PAINT } from './render/car.js';
+import { loadCitroen } from './render/citroen-ac.js';
 import { ChaseCamera } from './render/camera.js';
 import { Effects } from './render/effects.js';
 import { HUD } from './render/hud.js';
@@ -92,9 +93,10 @@ const wheelUI = new WheelUI(wheel, ffb, save, () => {
     if (info.wheel) hud.toast('WHEEL: ' + info.name, 2.2);
   } catch { /* no bridge running, which is the normal case */ }
 })();
-const secretCar = !!(save.brabusUnlocked && save.car === 'brabus');
+const brabusCar = !!(save.brabusUnlocked && save.car === 'brabus');
+const carKind = brabusCar ? 'brabus' : save.car === 'citroen' ? 'citroen' : 'stock';
 const stockPaint = PAINTS.find((p) => p.id === save.paint) || PAINTS[0];
-const paint = secretCar ? SECRET_PAINT : stockPaint;
+const paint = brabusCar ? SECRET_PAINT : stockPaint;
 audio.setMasterVolume(save.volume ?? 0.9);
 audio.setEngineVolume(save.engineVol ?? 1.15);
 audio.setWindVolume(save.windVol ?? 1.0);
@@ -105,7 +107,7 @@ let effects = null;
 let carMesh = null;
 let game = null;
 const camRig = new ChaseCamera(camera);
-camRig.carKind = secretCar ? 'brabus' : 'stock';
+camRig.carKind = carKind;
 
 // Sizing, DPR, UI scale and fullscreen live in core/display.js; it needs the
 // canvas, renderer and camera, but owns none of them.
@@ -139,8 +141,10 @@ function loadWorld(trackDef) {
   effects = new Effects(scene, trackDef.palette);
 
   if (carMesh) scene.remove(carMesh.root);
-  carMesh = createCarMesh(paint, { imported: secretCar });
+  carMesh = createCarMesh(paint, { kind: carKind });
   scene.add(carMesh.root);
+  camRig.carKind = carMesh.kind || carKind;
+  if (carMesh.wheelContact) effects.setWheelSpec(carMesh.wheelContact);
 
   camRig.track = track;
   camRig._hint = -1;
@@ -866,6 +870,13 @@ function frameBody(now) {
 /* ============================================================
    GO
    ============================================================ */
+/* The Tourer is 15-20 MB and is only needed when it is the chosen body, so it
+   is loaded here rather than at module scope. Stock/R170 boots never fetch it. */
+if (carKind === 'citroen') {
+  const loadingLabel = document.querySelector('#loading span');
+  if (loadingLabel) loadingLabel.textContent = 'LOADING CITROEN C5 TOURER';
+  await loadCitroen();
+}
 loadWorld(TRACK_DEFS[0]);
 buildBestStrip();
 buildModeCards();

@@ -1,8 +1,8 @@
 # DRIFTBLOCK
 
 A 3D drift racing game with blocky minimalist graphics, running entirely in the
-browser. No build step, no asset files — every circuit, sound and particle is
-generated at runtime.
+browser. No build step — every circuit, sound and particle is generated at
+runtime, while the garage's two imported car bodies live under `assets/mods/`.
 
 The car is a blocky portrait of the owner's graphite-black metallic Mercedes-Benz SLK 200
 Kompressor (R170 facelift): **7-KNJ-43** plates, a **BRABUS** boot badge, and the
@@ -368,11 +368,26 @@ harmonic set.
 
 ---
 
+## Credits
+
+- "Citroen C5 Sedan And Estate" (https://skfb.ly/pvzsT) by Nieve5677 is licensed
+  under Creative Commons Attribution (http://creativecommons.org/licenses/by/4.0/).
+  Modified for DRIFTBLOCK: only the Tourer/estate body is used, the wheels are
+  separated for steering and spin, and the mesh is decimated for real-time rendering.
+
+![Citroen C5 Tourer](docs/citroen-tourer-front.png)
+
+---
+
 ## Project layout
 
 ```
 index.html            markup, HUD, and the boot-state marker tools/bootcheck reads
 package.json          no runtime dependencies, on purpose
+assets/
+  mods/                imported car meshes + their credits
+    citroen-c5/        C5 Tourer game GLB, rebuilt by tools/blender/citroen_build.py
+    slk200/            R170 game GLB, badges and plates
 src/
   main.js             bootstrap, wiring and the per-frame orchestration
   core/
@@ -390,6 +405,8 @@ src/
     car.js            blocky facelift SLK R170 mesh, wheels + visual state
     car-spec.js       visible R170 wheelbase/track shared with the effects
     slk.js            the R170 shell, greenhouse, side details and badges
+    slk-ac.js         imported R170 mesh, cockpit controls and gauges
+    citroen-ac.js     imported C5 Tourer materials, wheels and brake lights
     slk-geo.js        low-poly profile/plate/arch shape helpers
     slk-fenders.js    side skins, open wheel arches, fender lips, wheel wells
     slk-lights.js     mesh grille, blocky faceted headlamps and triangular tail lamps
@@ -425,6 +442,8 @@ tools/
     bridge.mjs        native wheel + force feedback bridge
     g29.mjs           minimal, safe force-feedback driver
     ws-server.mjs     dependency-free WebSocket server
+  blender/
+    citroen_build.py  rebuilds the C5 Tourer GLB from the source ZIP
 ```
 
 ### Development tools

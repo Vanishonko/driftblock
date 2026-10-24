@@ -38,7 +38,7 @@ export class ChaseCamera {
     this.track = null;
     this._hint = -1;
     this.cockpitZoom = 0;   // FOV offset, only applied in HOOD
-    this.carKind = 'stock'; // stock uses the original rig distances
+    this.carKind = 'stock'; // stock | brabus | citroen
     this._bindCockpitZoom();
   }
 
@@ -104,6 +104,7 @@ export class ChaseCamera {
     // ---- rig dimensions per mode
     let dist, height, lookAhead, fovBase, stiffness;
     const brabus = this.carKind === 'brabus';
+    const citroen = this.carKind === 'citroen';
     switch (CAM_MODES[this.mode]) {
       case 'CLOSE':
         if (brabus) { dist = 3.4; height = 1.4; lookAhead = 5; fovBase = 66; stiffness = 10; }
@@ -114,7 +115,8 @@ export class ChaseCamera {
         else { dist = 12.6; height = 4.6; lookAhead = 17; fovBase = 63; stiffness = 5; }
         break;
       case 'HOOD':
-        dist = -0.15; height = 1.42; lookAhead = 26; fovBase = brabus ? 72 : 74; stiffness = 22; break;
+        dist = -0.15; height = 1.42; lookAhead = 26;
+        fovBase = brabus || citroen ? 72 : 74; stiffness = 22; break;
       default:
         if (brabus) { dist = 6.7; height = 2.55; lookAhead = 11; fovBase = 68; stiffness = 7; }
         else { dist = 7.9; height = 2.95; lookAhead = 13; fovBase = 68; stiffness = 7; }
@@ -188,9 +190,13 @@ export class ChaseCamera {
       const rx = Math.cos(s.yaw), rz = -Math.sin(s.yaw);
       // BRABUS: driver-eye cockpit. Original car: a real hood cam, out over
       // the bonnet and centred, otherwise the blocky cabin fills the screen.
-      const back = brabus ? -0.38 : 0.98;
+      // Citroen Tourer: further forward still — its windscreen base is around
+      // z = +1.0 and its bonnet top is just over 1 m, so an eye at +1.55 sits
+      // on the bonnet with no cabin in frame and only a slim strip of paint.
+      const back = brabus ? -0.38 : citroen ? 1.55 : 0.98;
       const side = brabus ? 0.32 : 0.0;
-      const eyeY = brabus ? 0.97 : 1.26;
+      const eyeY = brabus ? 0.97 : citroen ? 1.18 : 1.26;
+      const pitch = brabus ? -0.030 : citroen ? -0.050 : -0.040;
       this.cam.position.set(
         s.x + chx * back + rx * side + shX * 0.25,
         eyeY + shY * 0.18,
@@ -198,7 +204,7 @@ export class ChaseCamera {
       );
       this.cam.rotation.order = 'YXZ';
       this.cam.rotation.set(
-        (brabus ? -0.030 : -0.040) + shY * 0.05,
+        pitch + shY * 0.05,
         s.yaw + Math.PI + shX * 0.05,
         this._rollCur * (brabus ? 0.45 : 0.28)
       );

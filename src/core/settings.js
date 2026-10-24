@@ -29,7 +29,7 @@ export const DEFAULTS = Object.freeze({
   schema: SCHEMA,
   paint: 'magenta',
   spec: 'balanced',        // was `tune` in v1
-  car: 'stock',            // stock | brabus (hidden)
+  car: 'stock',            // stock | citroen | brabus (hidden)
   brabusUnlocked: false,  // set by typing the garage code
   bests: {},
   wheel: null,             // the whole wheel calibration, see input/wheel.js
