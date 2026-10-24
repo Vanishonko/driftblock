@@ -19,6 +19,7 @@ export class Input {
       handbrakeEdge: false,
       reset: false,
       camToggle: false,
+      frontCam: false,
     };
 
     this.touch = { active: false, x: 0, y: 0, hand: false, boost: false, brake: false };
@@ -277,6 +278,9 @@ export class Input {
 
     this.state.reset = this.pressedThisFrame.has('KeyR') || wheelReset;
     this.state.camToggle = this.pressedThisFrame.has('KeyC') || wheelCam;
+    // Hold X for a camera in front of the car looking back at it; released,
+    // the selected camera mode takes over again.
+    this.state.frontCam = this.keys.has('KeyX');
     this.state.pause = this.pressedThisFrame.has('Escape') || this.pressedThisFrame.has('KeyP');
     this.state.confirm = this.pressedThisFrame.has('Enter') || this.pressedThisFrame.has('NumpadEnter');
     this.state.any = this.pressedThisFrame.size > 0;

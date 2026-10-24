@@ -71,6 +71,7 @@ worse than the parse failing.
 | Fire mini-turbo | `Shift` | A | bindable button | BOOST button |
 | Reset to track | `R` | — | bindable button | — |
 | Change camera | `C` | — | bindable button | — |
+| Front view (hold) | `X` | — | — | — |
 | Pause | `Esc` | — | — | — |
 
 Once a wheel is connected it owns the driving controls outright; a wheel and a

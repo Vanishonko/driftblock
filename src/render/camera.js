@@ -248,6 +248,20 @@ export class ChaseCamera {
     this.fovPunch = clamp((this.fovCur - this.fovSteady) / 22, 0, 1);
     this.cam.fov = this.fovCur;
     this.cam.updateProjectionMatrix();
+
+    // ---- hold-to-front showcase (X)
+    // A temporary hero view from in front of the nose, looking back at the
+    // car. It is deliberately outside the normal rig so it works in every
+    // camera mode and the selected mode is still there when the key is let go.
+    if (extra.front) {
+      const fx = Math.sin(s.yaw), fz = Math.cos(s.yaw);
+      const dist = 5.2;
+      this.cam.up.set(0, 1, 0);
+      this.cam.position.set(s.x + fx * dist, 1.90, s.z + fz * dist);
+      this.cam.lookAt(s.x, 0.85, s.z);
+      this.cam.fov = 52;
+      this.cam.updateProjectionMatrix();
+    }
   }
 
   /** hard snap, used on reset / spawn */

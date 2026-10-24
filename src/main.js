@@ -756,7 +756,7 @@ function frameBody(now) {
     const st = game.car;
     updateCarVisual(carMesh, st, input.state, rawDt, game.onGrass);
     effects.update(rawDt, st, { onGrass: game.onGrass, boost: st.boost, wheelspin: st.wheelspin, painting: paint });
-    camRig.update(rawDt, st, { boost: st.boost, accel: st.longAccel });
+    camRig.update(rawDt, st, { boost: st.boost, accel: st.longAccel, front: !!input.state.frontCam });
     track.updateShadow(st);
     track.updateClouds(rawDt);
 
