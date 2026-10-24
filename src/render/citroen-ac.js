@@ -49,6 +49,163 @@ function phong(options) {
   });
 }
 
+/** One point of a five-pointed star, for the EU badge. */
+function drawStar(ctx, cx, cy, r, color) {
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  for (let i = 0; i < 10; i++) {
+    const angle = -Math.PI / 2 + i * Math.PI / 5;
+    const radius = i % 2 === 0 ? r : r * 0.42;
+    const x = cx + Math.cos(angle) * radius;
+    const y = cy + Math.sin(angle) * radius;
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  }
+  ctx.closePath();
+  ctx.fill();
+}
+
+/**
+ * A Bulgarian plate: EU blue band with stars and BG, then the registration
+ * grouped as the country displays it.
+ * @returns {THREE.CanvasTexture|null}
+ */
+function makeBulgarianPlate() {
+  if (typeof document === 'undefined') return null;
+
+  const W = 1024, H = 216;
+  const canvas = document.createElement('canvas');
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+
+  ctx.fillStyle = '#f4f2e8';
+  ctx.fillRect(0, 0, W, H);
+  ctx.strokeStyle = '#1b1e24';
+  ctx.lineWidth = 10;
+  ctx.strokeRect(5, 5, W - 10, H - 10);
+
+  const band = 122;
+  ctx.fillStyle = '#003399';
+  ctx.fillRect(10, 10, band, H - 20);
+  const cx = 10 + band / 2;
+  for (let i = 0; i < 12; i++) {
+    const angle = -Math.PI / 2 + i * Math.PI / 6;
+    drawStar(ctx, cx + Math.cos(angle) * 29, 78 + Math.sin(angle) * 29, 5.5, '#ffd617');
+  }
+  ctx.fillStyle = '#f4f2e8';
+  ctx.font = 'bold 42px Arial, Helvetica, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('BG', cx, 171);
+
+  // Bulgarian registration grouping: two letters, four digits, two letters.
+  ctx.fillStyle = '#161a20';
+  ctx.font = 'bold 116px Arial, Helvetica, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('CB 9107 CH', band + (W - band) / 2, H / 2 + 3);
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
+  return tex;
+}
+
+/** Find the one body mesh that uses a material with this name prefix. */
+function meshWithMaterial(model, prefix) {
+  let found = null;
+  model.traverse((o) => {
+    if (found || !o.isMesh) return;
+    const mats = Array.isArray(o.material) ? o.material : [o.material];
+    if (mats.some((m) => m && (m.name || '').toLowerCase().startsWith(prefix))) found = o;
+  });
+  return found;
+}
+
+/** Vertices of one plate cluster (front z>0, rear z<0) in model space. */
+function platePoints(mesh, front) {
+  const pos = mesh.geometry.getAttribute('position');
+  const points = [];
+  for (let i = 0; i < pos.count; i++) {
+    const z = pos.getZ(i);
+    if (front ? z > 0 : z < 0) points.push(new THREE.Vector3(pos.getX(i), pos.getY(i), pos.getZ(i)));
+  }
+  return points;
+}
+
+/** Centre of a point cloud. */
+function centreOf(points) {
+  return new THREE.Box3().setFromPoints(points).getCenter(new THREE.Vector3());
+}
+
+/** The rear plate leans with the tailgate; recover its up direction. */
+function rearPlateUp(blueMesh) {
+  if (!blueMesh) return new THREE.Vector3(0, 1, 0);
+  const pts = platePoints(blueMesh, false);
+  if (!pts.length) return new THREE.Vector3(0, 1, 0);
+  let zmin = Infinity, zmax = -Infinity;
+  for (const p of pts) { if (p.z < zmin) zmin = p.z; if (p.z > zmax) zmax = p.z; }
+  const mid = (zmin + zmax) / 2;
+  const low = new THREE.Vector3(), high = new THREE.Vector3();
+  let nl = 0, nh = 0;
+  for (const p of pts) {
+    if (p.z < mid) { low.add(p); nl++; } else { high.add(p); nh++; }
+  }
+  if (!nl || !nh) return new THREE.Vector3(0, 1, 0);
+  low.divideScalar(nl); high.divideScalar(nh);
+  const up = high.sub(low).normalize();
+  return up.lengthSq() > 0.1 ? up : new THREE.Vector3(0, 1, 0);
+}
+
+/**
+ * Replace the model's "HUMSTER3D" plate text with a Bulgarian plate. The old
+ * plate materials are hidden behind a pair of textured planes placed on the
+ * front and rear plate clusters.
+ */
+function addBulgarianPlates(model) {
+  const textMesh = meshWithMaterial(model, 'material__2');
+  if (!textMesh) return;
+
+  const blueMesh = meshWithMaterial(model, 'material__3');
+  const texture = makeBulgarianPlate();
+  if (!texture) return;
+
+  const material = new THREE.MeshBasicMaterial({
+    map: texture,
+    side: THREE.DoubleSide,
+    toneMapped: false,
+  });
+
+  const frontPoints = platePoints(textMesh, true);
+  const rearPoints = platePoints(textMesh, false);
+  if (!frontPoints.length && !rearPoints.length) return;
+
+  // Hide the old white/black/blue/yellow plate pieces; the planes replace them.
+  for (const prefix of ['material__1', 'material__2', 'material__3', 'material__4']) {
+    const mesh = meshWithMaterial(model, prefix);
+    if (mesh) mesh.visible = false;
+  }
+
+  const addPlate = (points, up) => {
+    if (!points.length) return;
+    const centre = centreOf(points);
+    const normal = new THREE.Vector3().crossVectors(up, new THREE.Vector3(1, 0, 0)).normalize();
+    // The front normal is +Z, the rear normal is -Z plus the tailgate rake.
+    if (normal.z * centre.z < 0) normal.negate();
+    const right = normal.z > 0 ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(-1, 0, 0);
+    const plateUp = new THREE.Vector3().crossVectors(normal, right).normalize();
+    const plane = new THREE.Mesh(new THREE.PlaneGeometry(0.52, 0.11), material);
+    plane.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(right, plateUp, normal));
+    plane.position.copy(centre).addScaledVector(normal, 0.003);
+    plane.castShadow = false;
+    plane.receiveShadow = true;
+    plane.userData.noConvert = true; // keep the plate texture out of the car repaint
+    model.add(plane);
+  };
+
+  addPlate(frontPoints, new THREE.Vector3(0, 1, 0));
+  addPlate(rearPoints, rearPlateUp(blueMesh));
+}
+
 /**
  * Build the visible Tourer on the game chassis. The model is already in
  * metres, grounded at y=0 and centred on its wheelbase, so the only offset is
@@ -67,6 +224,10 @@ export function createCitroenCar(paint) {
   const model = citroenScene.clone(true);
   model.position.set(0, -chassis.position.y, 0);
   chassis.add(model);
+
+  // The source car wears a watermark plate. Replace it with the game's
+  // Bulgarian registration before the imported materials are repainted.
+  addBulgarianPlates(model);
 
   const cache = new Map();
   const brakeMats = [];
@@ -171,6 +332,7 @@ export function createCitroenCar(paint) {
 
   model.traverse((o) => {
     if (!o.isMesh) return;
+    if (o.userData && o.userData.noConvert) return;
     o.castShadow = false;
     o.receiveShadow = true;
     const src = Array.isArray(o.material) ? o.material : [o.material];
