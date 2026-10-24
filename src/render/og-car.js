@@ -16,6 +16,7 @@ export const OG_PAINTS = [
   { id: 'lime', name: 'ACID LIME', body: 0xb6ff3d, trim: 0x1c2606, accent: 0x1a1e2e },
   { id: 'purple', name: 'ROYAL PURPLE', body: 0x8b5cf6, trim: 0x1a0f33, accent: 0x2fe0ff },
   { id: 'white', name: 'ARCTIC WHITE', body: 0xf0f4ff, trim: 0x22273a, accent: 0xff2e7e },
+  { id: 'silver', name: 'GRIS FULMINATOR', body: 0xbfc5ce, trim: 0x2c3139, accent: 0x68707b },
   { id: 'midnight', name: 'MIDNIGHT', body: 0x232a3d, trim: 0x0c0f18, accent: 0x2fe0ff },
   { id: 'taxi', name: 'TAXI YELLOW', body: 0xffcc33, trim: 0x1a1a1a, accent: 0x1a1a1a },
 ];
