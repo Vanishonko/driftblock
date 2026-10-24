@@ -1,6 +1,6 @@
 {
   "name": "driftblock",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "private": true,
   "description": "A blocky 3D drift racing game. Browser, no build step, no assets — every circuit, sound and particle generated at runtime.",
   "type": "module",
